@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<!--
+  打工人小账本 · 单文件工作台
+  视觉：奶油薄荷手账风（内联SVG图标 + 小猪存钱罐插画）
+  数据层：在线优先 + 本地兜底。
+  ⚠️ 本会话资料库鉴权不可用（Open Platform 令牌签发失败），当前数据走浏览器本地存储(localStorage)。
+     线上升级路径：把"流水记录"建成资料库数据表 workspace_ledger_tx（字段见下），"个人设置"建成
+     workspace_ledger_settings；在数据层 ONLINE 开关填入接口后，页面读写自动切到线上，实现多设备同步。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#9FE0C4">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="打工人小账本">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="application-name" content="打工人小账本">
+<meta name="description" content="每一笔，都是自由的积累。本地 + 云端同步的个人账本。">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-512.png" sizes="512x512">
+<title>打工人小账本</title>
+<style>
+  :root{
+    --cream:#FBF6EC; --cream2:#FDFBF5; --card:#FFFDF8;
+    --mint:#9FE0C4; --mint-deep:#56B98C; --mint-soft:#DCF1E8;
+    --pink:#F7C6C0; --pink-deep:#EFA59C; --peach:#FBE3C8;
+    --ink:#5B5249; --ink-soft:#9A9085; --line:#EAE0CF; --line2:#F0E8D9;
+    --expense:#E07A6E; --income:#3FAE85; --warn:#E8857A; --ok:#56B98C;
+    --shadow:0 8px 22px rgba(150,138,118,.16); --shadow-sm:0 4px 12px rgba(150,138,118,.12);
+    --r:20px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:
+      radial-gradient(circle at 12% 8%, #FFF7E9 0, transparent 38%),
+      radial-gradient(circle at 88% 92%, #E9F6EF 0, transparent 42%),
+      var(--cream);
+    color:var(--ink); font-size:15px; line-height:1.55;
+    min-height:100vh;
+  }
+  .app{display:flex; min-height:100vh;}
+
+  /* ---------- 侧栏（桌面） ---------- */
+  .sidebar{
+    width:236px; flex:0 0 236px; padding:22px 16px 22px;
+    background:linear-gradient(180deg,#FFFDF8,#FBF4E6);
+    border-right:1px dashed var(--line);
+    display:flex; flex-direction:column; gap:6px;
+    position:sticky; top:0; height:100vh;
+  }
+  .brand{display:flex; align-items:center; gap:10px; padding:6px 8px 14px;}
+  .brand .pig{width:46px; height:42px; flex:0 0 46px;}
+  .brand .name{font-size:18px; font-weight:800; letter-spacing:.5px; color:var(--ink);}
+  .brand .sub{font-size:11px; color:var(--ink-soft); margin-top:1px;}
+  .nav-item{
+    display:flex; align-items:center; gap:11px; padding:12px 14px; border-radius:14px;
+    color:var(--ink-soft); cursor:pointer; font-weight:600; font-size:14.5px;
+    transition:.18s; border:1px solid transparent; min-height:46px;
+  }
+  .nav-item svg{width:21px; height:21px; flex:0 0 21px;}
+  .nav-item:hover{background:var(--mint-soft); color:var(--ink);}
+  .nav-item.active{
+    background:linear-gradient(135deg,#FFF,#E9F6EF); color:var(--mint-deep);
+    border-color:#CDEADD; box-shadow:var(--shadow-sm);
+  }
+  .nav-spacer{flex:1;}
+  .side-foot{font-size:11px; color:var(--ink-soft); padding:8px 12px; line-height:1.5;}
+
+  /* ---------- 主区 ---------- */
+  .main{flex:1; min-width:0; padding:18px 22px 40px; max-width:1100px; margin:0 auto; width:100%;}
+  .topbar{display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
+  .topbar h1{font-size:21px; margin:0; font-weight:800; letter-spacing:.5px;}
+  .topbar .date{font-size:12.5px; color:var(--ink-soft); margin-left:auto;}
+  .sync{
+    display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px;
+    font-size:12.5px; font-weight:600; border:1px solid var(--line); background:var(--card);
+  }
+  .sync .dot{width:9px; height:9px; border-radius:50%;}
+  .sync.ok .dot{background:var(--ok);}
+  .sync.err .dot{background:var(--ink-soft);}
+  .sync.busy .dot{background:#E6B85A; animation:pulse 1s infinite;}
+  .sync.local .dot{background:var(--ink-soft);}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  .sync button{
+    border:none; background:var(--mint-deep); color:#fff; font-weight:700;
+    border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer;
+  }
+
+  .view{display:none; animation:fade .25s ease;}
+  .view.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+
+  /* ---------- 卡片 ---------- */
+  .card{
+    background:var(--card); border:1px solid var(--line2); border-radius:var(--r);
+    padding:18px; box-shadow:var(--shadow-sm); position:relative; margin-bottom:16px;
+  }
+  .card.tilt{transform:rotate(-.5deg);}
+  .card h2{font-size:16px; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+  .card h2 svg{width:19px; height:19px;}
+  .muted{color:var(--ink-soft); font-size:12.5px;}
+  .grid{display:grid; gap:14px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g4{grid-template-columns:1fr 1fr 1fr 1fr;}
+  @media(max-width:900px){ .g3{grid-template-columns:1fr 1fr;} }
+  @media(max-width:520px){ .g2{grid-template-columns:1fr 1fr;} .g3{grid-template-columns:1fr 1fr;} .g4{grid-template-columns:1fr 1fr;} }
+
+  /* washi tape 装饰 */
+  .tape{position:absolute; width:64px; height:18px; top:-8px; left:18px;
+    background:repeating-linear-gradient(45deg,#CDEADD,#CDEADD 7px,#BCE3D2 7px,#BCE3D2 14px);
+    border-radius:3px; opacity:.85; transform:rotate(-3deg); box-shadow:0 2px 5px rgba(0,0,0,.05);}
+
+  /* 统计块 */
+  .stat{background:var(--cream2); border-radius:14px; padding:12px 14px; border:1px solid var(--line2);
+    display:flex; flex-direction:column; gap:6px; min-height:0;}
+  .stat .lab{font-size:11.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px;
+    line-height:1.2; font-weight:600;}
+  .stat .lab svg{width:16px; height:16px; flex:0 0 16px;}
+  .stat .val{font-size:20px; font-weight:800; letter-spacing:.3px; line-height:1.1;
+    font-variant-numeric:tabular-nums;}
+  .stat .val small{font-size:12px; font-weight:600; color:var(--ink-soft);}
+  .in{color:var(--income);} .out{color:var(--expense);} .mint{color:var(--mint-deep);}
+
+  /* 今日待处理 */
+  .todo-item{
+    display:flex; align-items:center; gap:11px; padding:12px 14px; border-radius:14px;
+    background:var(--cream2); border:1px solid var(--line2); margin-bottom:9px;
+  }
+  .todo-item.overdue{border-color:#F3C9C2; background:#FFF3F1;}
+  .todo-item .ic{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; flex:0 0 34px;}
+  .todo-item.overdue .ic{background:#FBE0DB;}
+  .todo-item .ic svg{width:19px; height:19px;}
+  .todo-item .txt{flex:1; font-size:13.5px;}
+  .todo-item .txt b{display:block; font-size:14px;}
+  .todo-item .act{
+    border:none; background:var(--mint-deep); color:#fff; font-weight:700; border-radius:999px;
+    padding:8px 14px; font-size:12.5px; cursor:pointer; min-height:38px;
+  }
+  .todo-item.overdue .act{background:var(--warn);}
+
+  /* 表单 */
+  label.fld{display:block; margin-bottom:13px;}
+  label.fld .t{font-size:12.5px; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:5px;}
+  input,select,textarea{
+    width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px;
+    font-size:16px; background:var(--cream2); color:var(--ink); font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:none; border-color:var(--mint-deep); background:#fff;}
+  .seg{display:flex; gap:8px; flex-wrap:wrap;}
+  .seg button{
+    flex:1; min-width:84px; min-height:46px; border:1px solid var(--line); background:var(--cream2);
+    border-radius:13px; font-size:14px; font-weight:700; color:var(--ink-soft); cursor:pointer; padding:10px;
+  }
+  .seg button.on{background:var(--mint-deep); color:#fff; border-color:var(--mint-deep);}
+  .seg button.on.in{background:var(--income); border-color:var(--income);}
+  .seg button.on.out{background:var(--expense); border-color:var(--expense);}
+
+  .btn{
+    border:none; border-radius:14px; padding:13px 18px; font-size:15px; font-weight:800;
+    cursor:pointer; min-height:48px; width:100%; color:#fff; background:var(--mint-deep);
+    box-shadow:var(--shadow-sm); transition:.15s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn.ghost{background:var(--cream2); color:var(--ink); border:1px solid var(--line);}
+  .btn.warn{background:var(--warn);}
+  .btn.mint{background:linear-gradient(135deg,#C9B8E0,#A89AD4); color:#fff;}
+  .btn-row{display:flex; gap:10px;}
+  .btn-row .btn{width:auto; flex:1;}
+
+  /* 云端同步：已连接 pill + 到期提醒 */
+  .conn-pill{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    background:linear-gradient(135deg,#EAF7F0,#D4F0E2);
+    border:1px solid var(--mint);
+    border-radius:14px; padding:12px 14px; margin-bottom:6px;
+    font-weight:700; color:var(--ink); font-size:15px;
+  }
+  .conn-pill .dot{width:10px; height:10px; border-radius:50%; background:var(--mint); box-shadow:0 0 0 4px #56B98C40;}
+  .conn-pill .t{color:var(--mint-deep);}
+  .conn-pill .repo{font-weight:600; color:var(--ink); font-size:13px; opacity:.85;}
+  .conn-sub{margin:0 0 12px 4px; font-size:12.5px;}
+
+  .tok-warn{
+    border-radius:12px; padding:10px 12px; margin:8px 0 12px;
+    font-size:13.5px; font-weight:600; border:1px solid transparent;
+  }
+  .tok-warn.tok-amber{background:#FFF6E0; border-color:#F0C77B; color:#9C7320;}
+  .tok-warn.tok-red  {background:#FBE3DA; border-color:#EFA59C; color:#A04236;}
+  .tok-warn.tok-ok   {background:#EAF7F0; border-color:#9FE0C4; color:#2E7459;}
+  .sync-status{padding:8px 12px; margin:8px 0 4px; border-radius:10px; font-size:13px; background:#eef1f0; color:#3a4a44;}
+  .sync-status.ok{background:#EAF7F0; color:#2E7459;}
+  .sync-status.warn{background:#FFF6E0; color:#9C7320;}
+  .sync-status.err{background:#FBE3DA; color:#A04236;}
+
+  /* ============ 仪表盘新模块：月度结算条 / 排行榜 / 快记支出网格 ============ */
+  /* 月度结算条 — v22 紧凑三列等高 */
+  .settle-row{display:grid; grid-template-columns:1fr 1fr 1fr; align-items:stretch; gap:0; background:var(--cream2); border:1px solid var(--line2); border-radius:14px; padding:6px;}
+  .settle-item{text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px; border-radius:10px; min-width:0;}
+  .settle-item + .settle-item{position:relative;}
+  .settle-item + .settle-item::before{content:'';position:absolute;left:0;top:14%;bottom:14%;width:1px;background:var(--line2);}
+  .settle-item .lab{font-size:10.5px; color:var(--ink-soft); font-weight:700; letter-spacing:.5px; text-transform:uppercase;}
+  .settle-item .val{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1; letter-spacing:-.3px;}
+  .settle-item .val.in{color:var(--income)} .settle-item .val.out{color:var(--expense)} .settle-item .val.mint{color:var(--mint-deep)}
+  .settle-item .sub{font-size:10.5px; color:var(--ink-soft); font-weight:600;}
+  .settle-final{background:#EAF7F0;}
+  .settle-final .lab{color:var(--mint-deep);}
+  .settle-final .sub{color:var(--mint-deep);opacity:.85;}
+  .settle-final .val{font-size:21px;}
+  .settle-op{display:none;}  /* v22 删除，减噪 */
+  .settle-meta{margin-top:10px; font-size:11.5px; color:var(--ink-soft); text-align:center;}
+  .month-card{background:linear-gradient(180deg,#FFFDF7,#FFFDF7);}
+  /* 月份 chip 小尺寸分段器 */
+  .seg-sm button{flex:0 0 auto; min-width:50px; min-height:32px; padding:5px 10px; font-size:12px; border-radius:9px}
+
+  /* 排行榜 */
+  .rank-row{display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px dashed var(--line2)}
+  .rank-row:first-child{border-top:none; padding-top:4px}
+  .rank-no{width:22px; height:22px; border-radius:50%; background:var(--cream2); color:var(--ink-soft); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex:none; border:1px solid var(--line2)}
+  .rank-no.top{background:linear-gradient(135deg,#FFE9B8,#F2B5A6); color:#fff; border-color:transparent; box-shadow:0 2px 6px rgba(242,181,166,.35)}
+  .rank-ico{width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none}
+  .rank-ico svg{width:18px; height:18px}
+  .rank-body{flex:1; min-width:0}
+  .rank-line{display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:5px}
+  .rank-name{font-size:13.5px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .rank-amt{font-size:13.5px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; flex:none}
+  .rank-bar{height:6px; background:var(--line2); border-radius:99px; overflow:hidden}
+  .rank-fill{height:100%; border-radius:99px; transition:width .3s}
+  .rank-pct{font-size:12px; color:var(--ink-soft); font-variant-numeric:tabular-nums; flex:none; min-width:36px; text-align:right}
+
+  /* 快记支出 8 网格 */
+  .expense-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:6px}
+  .exp-cell{
+    background:var(--cream2); border:1px solid var(--line2); border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 6px;
+    cursor:pointer; transition:.15s; color:var(--ink); font:inherit;
+  }
+  .exp-cell:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm)}
+  .exp-cell:active{transform:scale(.97)}
+  .exp-ico{width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .2s}
+  .exp-cell:hover .exp-ico{transform:scale(1.08)}
+  .exp-ico svg{width:22px; height:22px}
+  .exp-name{font-size:12.5px; font-weight:600; color:var(--ink)}
+  /* 选中的分类 chip（薄荷勾） */
+  .exp-cell.on{
+    background:var(--mint-deep); border-color:var(--mint);
+    box-shadow:0 0 0 2px var(--mint) inset, var(--shadow-sm);
+  }
+  .exp-cell.on .exp-name{color:#fff}
+  .exp-cell.on .exp-ico{transform:scale(1.08); background:#fff !important; color:var(--mint-deep) !important}
+
+  /* 内联「分类选择」区（在 10 秒记一笔卡片内） */
+  .pickerWrap{padding-top:2px}
+  .pickerTitle{display:flex; align-items:center; gap:6px; margin:0 0 4px; font-size:16px; font-weight:700; color:var(--ink)}
+
+  /* 记账结果换算 */
+  .convert{
+    margin-top:12px; padding:14px; border-radius:14px; background:linear-gradient(135deg,#EAF7F0,#FBF4E6);
+    border:1px dashed var(--mint); display:flex; align-items:center; gap:12px;
+  }
+  .convert .pig{width:42px; height:38px; flex:0 0 42px;}
+  .convert .big{font-size:20px; font-weight:800; color:var(--mint-deep);}
+  .convert .sub{font-size:12.5px; color:var(--ink-soft);}
+
+  /* 流水行 — v23 优化：c 渲染为圆角 chip，icon 略缩，间距更紧 */
+  .tx{display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px dashed var(--line2);}
+  .tx:last-child{border-bottom:none;}
+  .tx .ic{width:36px; height:36px; border-radius:11px; display:grid; place-items:center; flex:0 0 36px; background:var(--cream2); box-shadow:inset 0 0 0 1px var(--line2);}
+  .tx .ic svg{width:18px; height:18px;}
+  .tx .ic.in{background:#E4F4EC;} .tx .ic.fixed{background:#EAF0F7;} .tx .ic.elastic{background:#FBEEE6;}
+  .tx .info{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px;}
+  .tx .info .c{
+    display:inline-flex; align-items:center; gap:5px;
+    font-weight:700; font-size:13px; line-height:1.2;
+    padding:4px 10px; border-radius:10px;
+    background:var(--catbg, var(--cream)); color:var(--catfg, var(--ink-deep, var(--ink)));
+    border:1px solid var(--catbd, var(--line));
+    width:fit-content; max-width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .tx .info .n{font-size:11.5px; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tx .amt{font-weight:800; font-size:15px; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .tx .ops{display:flex; gap:4px;}
+  .tx .ops button{border:none; background:transparent; cursor:pointer; padding:6px; border-radius:8px; min-width:32px; min-height:32px;}
+  .tx .ops button:hover{background:var(--cream2);}
+  .tx .ops svg{width:17px; height:17px;}
+
+  /* 全部流水：月份一级折叠（一级 chip 大）+ 类别二级折叠（二级 chip 中，chip+dot 风格） */
+  .txgroup{border:1px solid var(--line2); border-radius:14px; background:var(--cream2); margin-bottom:12px; overflow:hidden;}
+  .txgroup > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; padding:12px 14px; user-select:none;}
+  .txgroup > summary::-webkit-details-marker{display:none;}
+  .txgroup > summary .chev{color:var(--ink-soft); transition:transform .18s ease; flex:0 0 auto;}
+  .txgroup[open] > summary .chev{transform:rotate(90deg);}
+  .txgroup > summary .gname{font-weight:800; font-size:14.5px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .txgroup > summary .gmeta{font-size:12px; color:var(--ink-soft); flex:0 0 auto;}
+  .txgroup > summary .gamt{font-weight:800; font-size:14px; font-variant-numeric:tabular-nums; flex:0 0 auto;}
+
+  /* 二级：类别分组。当月默认 open，外月默认 close；点击展开/折叠 */
+  .txgroup .grow{padding:2px 4px 8px;}
+  .catsub{
+    margin:8px 8px 10px; border:1px solid var(--line2); border-radius:12px;
+    background:var(--card); overflow:hidden;
+    box-shadow:0 1px 0 rgba(154,144,133,.06);
+  }
+  .catsub > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:9px; padding:9px 12px; user-select:none;}
+  .catsub > summary::-webkit-details-marker{display:none;}
+  .catsub > summary .chev{color:var(--ink-soft); transition:transform .18s ease; flex:0 0 auto; width:14px; height:14px;}
+  .catsub[open] > summary .chev{transform:rotate(90deg);}
+  .catsub > summary .catdot{
+    width:10px; height:10px; border-radius:50%; flex:0 0 auto;
+    background:var(--catcol, var(--mint-deep));
+    box-shadow:0 0 0 2px color-mix(in srgb, var(--catcol, var(--mint-deep)) 18%, transparent);
+  }
+  .catsub > summary .catname{
+    font-weight:700; font-size:13.5px; flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink);
+    padding:3px 10px; background:var(--cream); border:1px solid var(--line2); border-radius:9px;
+    line-height:1.25; width:fit-content; max-width:100%;
+  }
+  .catsub > summary .catmeta{font-size:11.5px; color:var(--ink-soft); flex:0 0 auto; font-variant-numeric:tabular-nums;}
+  .catsub > summary .catamt{font-weight:800; font-size:13px; font-variant-numeric:tabular-nums; flex:0 0 auto;}
+  .catsub .crow{padding:0 4px 4px;}
+  .catsub .crow .tx:first-child{border-top:1px dashed var(--line2);}
+  .catsub .crow .tx:last-child{border-bottom:none;}
+  .linkbtn{border:none; background:transparent; color:var(--mint-deep); font-weight:700; cursor:pointer; padding:4px 6px; border-radius:8px;}
+  .linkbtn:hover{background:var(--cream2);}
+
+  /* 公式展开 */
+  .formula{background:var(--cream2); border:1px solid var(--line2); border-radius:14px; padding:14px 16px;}
+  .formula .row{display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px dashed var(--line2); font-size:13.5px;}
+  .formula .row:last-child{border-bottom:none;}
+  .formula .row .k{color:var(--ink-soft);}
+  .formula .row .v{font-weight:700;}
+  .formula .final{margin-top:10px; padding:12px; border-radius:12px; background:#EAF7F0; text-align:center; font-size:18px; font-weight:800; color:var(--mint-deep);}
+  .formula .final small{display:block; font-size:11.5px; color:var(--ink-soft); font-weight:600; margin-top:2px;}
+
+  /* 进度环 */
+  .ring-wrap{display:flex; align-items:center; gap:16px;}
+  .ring{position:relative; width:108px; height:108px; flex:0 0 108px;}
+  .ring .mid{position:absolute; inset:0; display:grid; place-items:center; flex-direction:column; text-align:center;}
+  .ring .mid .p{font-size:19px; font-weight:800; color:var(--mint-deep);}
+  .ring .mid .s{font-size:10.5px; color:var(--ink-soft);}
+  .ring-info .t{font-size:13.5px; font-weight:700;}
+  .ring-info .d{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
+
+  /* 反推条（合并自情景模拟） */
+  .sim{border:1px solid var(--line2); border-radius:16px; padding:14px; background:var(--cream2);}
+  .sim .hd{display:flex; align-items:center; gap:9px; font-weight:800; font-size:14.5px; margin-bottom:8px;}
+  .sim .hd svg{width:20px; height:20px;}
+  input[type=range]{width:100%; -webkit-appearance:none; height:8px; border-radius:999px; background:var(--mint-soft); padding:0; margin:14px 0 6px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:26px; height:26px; border-radius:50%; background:var(--mint-deep); border:3px solid #fff; box-shadow:var(--shadow-sm); cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:22px; height:22px; border-radius:50%; background:var(--mint-deep); border:3px solid #fff; cursor:pointer;}
+  .sim .res{display:flex; align-items:center; justify-content:space-between; margin-top:8px; padding:10px 12px; border-radius:12px; background:#fff; border:1px solid var(--line2);}
+  .sim .res .nl{font-size:12px; color:var(--ink-soft);}
+  .sim .res .nv{font-size:18px; font-weight:800;}
+  .delta-up{color:var(--income);} .delta-dn{color:var(--expense);}
+  /* 3 列滑块横排（反推条） */
+  .simrow{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
+  @media(max-width:760px){ .simrow{grid-template-columns:1fr; gap:8px;} }
+  /* 紧凑对比面板（基准 + 3 列 + tip） */
+  .sim-compact{margin-top:14px; padding:14px; border-radius:14px; background:linear-gradient(135deg,#fff 0%,var(--cream2) 100%); border:1px solid var(--line2);}
+  .sim-compact-head{font-size:13px; color:var(--ink-soft); margin-bottom:8px;}
+  .sim-compact-head b{color:var(--mint-deep); font-size:18px; font-weight:800; margin-left:4px;}
+  .sim-compact-cells{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
+  @media(max-width:460px){ .sim-compact-cells{grid-template-columns:1fr;} }
+  .sim-cell{padding:10px 12px; border-radius:10px; background:#fff; border:1px solid var(--line2);}
+  .sim-cell .lab{font-size:11px; color:var(--ink-soft); margin-bottom:4px;}
+  .sim-cell .val{font-size:16px; font-weight:800;}
+  .sim-cell .val small{font-size:11px; margin-left:4px; font-weight:700;}
+  .sim-compact-tip{font-size:12px; margin-top:10px; line-height:1.5;}
+
+  .skeleton{color:var(--ink-soft); text-align:center; padding:40px; font-size:14px;}
+
+  /* 底部Tab（手机） */
+  .bottomtab{display:none;}
+  @media(max-width:768px){
+    .sidebar{display:none;}
+    .main{padding:12px 12px 110px;}
+    .bottomtab{
+      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:50;
+      background:#FFFCF6; backdrop-filter:blur(8px);
+      border-top:1px solid #CDEADD; padding:6px 6px calc(8px + env(safe-area-inset-bottom));
+      justify-content:space-around;
+      box-shadow:0 -6px 16px rgba(91,82,73,.08);
+    }
+    .bt{
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:3px; padding:5px 2px; flex:1 0 0; max-width:88px;
+      cursor:pointer; color:var(--ink-soft); font-size:11px; font-weight:600;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .bt svg{width:22px; height:22px; flex:0 0 22px; display:block;}
+    .bt.active{color:var(--mint-deep);}
+    /* 紧凑卡片 */
+    .card{padding:13px 14px; margin-bottom:12px; border-radius:14px;}
+    .card h2{font-size:14.5px; margin:0 0 10px; gap:7px;}
+    .card h2 svg{width:17px; height:17px;}
+    .grid{gap:10px;}
+    /* 概览进度环缩小 */
+    .ring{width:78px; height:78px; flex:0 0 78px;}
+    .ring .mid .p{font-size:15px;}
+    .ring .mid .s{font-size:9.5px;}
+    .ring-info .t{font-size:13px;}
+    .ring-info .d{font-size:12px;}
+    /* 收入组合donut缩 */
+    .income-mix svg{width:96px !important; height:96px !important;}
+  }
+
+  /* toast */
+  .toast{position:fixed; left:50%; bottom:30px; transform:translateX(-50%); background:var(--ink); color:#fff;
+    padding:12px 20px; border-radius:999px; font-size:13.5px; font-weight:600; z-index:99; box-shadow:var(--shadow);
+    opacity:0; pointer-events:none; transition:.25s; max-width:90vw; text-align:center;}
+  .toast.show{opacity:1;}
+
+  /* modal */
+  .mask{position:fixed; inset:0; background:rgba(91,82,73,.35); display:none; place-items:center; z-index:80; padding:20px;}
+  .mask.show{display:grid;}
+  .modal{background:var(--card); border-radius:20px; padding:22px; max-width:360px; width:100%; box-shadow:var(--shadow);}
+  .modal h3{margin:0 0 8px; font-size:17px;}
+  .modal p{font-size:13.5px; color:var(--ink-soft); margin:0 0 16px;}
+  .err-banner{background:#FFF3F1; border:1px solid #F3C9C2; border-radius:14px; padding:16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .err-banner svg{width:24px; height:24px; color:var(--warn);}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="pig" id="pigSide"></span>
+      <div>
+        <div class="name">打工人小账本</div>
+        <div class="sub">每一笔，都是自由的积累</div>
+      </div>
+    </div>
+    <div class="nav-item active" data-view="dashboard">
+      <span id="icHome"></span> 仪表盘
+    </div>
+    <div class="nav-item" data-view="record">
+      <span id="icPen"></span> 10秒记账
+    </div>
+    <div class="nav-item" data-view="hourly">
+      <span id="icClock"></span> 真实时薪
+    </div>
+    <div class="nav-item" data-view="simulate">
+      <span id="icSlider"></span> 情景模拟
+    </div>
+    <div class="nav-item" data-view="settings">
+      <span id="icGear"></span> 我的设置
+    </div>
+    <div class="nav-spacer"></div>
+    <div class="side-foot">奶油薄荷手账风<br>数据可同步到你的 GitHub 私有仓库</div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">仪表盘</h1>
+      <span class="sync ok" id="syncBox">
+        <span class="dot"></span><span id="syncText">—</span>
+        <button id="syncRetry" style="display:none">重试</button>
+      </span>
+      <span class="date" id="todayDate"></span>
+    </div>
+
+    <div id="installBar" style="display:none;align-items:center;gap:12px;background:linear-gradient(135deg,#EAF7F0,#FFF7E9);border:1px solid #CDEADD;border-radius:16px;padding:12px 14px;margin-bottom:16px">
+      <span id="installText" style="flex:1;font-size:13.5px;font-weight:600;color:var(--ink)">把「打工人小账本」装到主屏幕</span>
+      <button id="installBtn" style="border:none;background:var(--mint-deep);color:#fff;font-weight:700;border-radius:999px;padding:8px 14px;font-size:12.5px;cursor:pointer">立即安装</button>
+      <button id="installIos" style="display:none;border:none;background:var(--mint-deep);color:#fff;font-weight:700;border-radius:999px;padding:8px 14px;font-size:12.5px;cursor:pointer">查看步骤</button>
+      <button id="installClose" style="border:none;background:transparent;color:var(--ink-soft);font-size:18px;cursor:pointer;padding:4px 8px">×</button>
+    </div>
+
+    <div id="errZone"></div>
+
+    <!-- 仪表盘 -->
+    <section class="view active" id="view-dashboard">
+      <div class="card tilt">
+        <div class="tape"></div>
+        <h2><span id="icBell"></span> 今天要处理</h2>
+        <div id="todoList"><div class="skeleton">加载中…</div></div>
+      </div>
+
+      <!-- 仪表盘新顺序 v23：收入组合 → 月度结算 → 支出三件套 → 4 格速览（真实时薪/月收入/固定支出/结余） → 存款曲线（最末） -->
+      <div class="card">
+        <h2><span id="icMix"></span> 收入组合 · 钱从哪来</h2>
+        <div id="incomeMix"></div>
+      </div>
+
+      <!-- 月度结算条：DOCK 上方，含月份切换 8月/9月/全部 -->
+      <div class="card month-card" id="monthCard">
+        <div class="tape"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0"><span id="icCoin"></span> 月度结算</h2>
+          <div class="seg seg-sm" id="monthSeg">
+            <!-- 月份 chip 由 JS 按数据动态生成 -->
+          </div>
+        </div>
+        <div id="monthSettlement" style="margin-top:12px"></div>
+      </div>
+
+      <!-- 支出三件套：占比 + 近7天趋势 + 排行榜 -->
+      <div class="card">
+        <h2><span id="icMix"></span> 支出分类占比</h2>
+        <div id="expenseMix"></div>
+      </div>
+
+      <div class="card">
+        <h2><span id="icChart"></span> 近 7 天支出趋势</h2>
+        <div id="expenseTrend"></div>
+      </div>
+
+      <div class="card">
+        <h2><span id="icList"></span> 支出排行榜</h2>
+        <div id="expenseRank"></div>
+      </div>
+
+      <!-- 4 格速览：真实时薪 / 本月收入 / 本月固定支出 / 本月结余（从 todoList 下方移到这里） -->
+      <div class="grid g4" id="dashStats">
+        <div class="skeleton">加载中…</div>
+      </div>
+
+      <!-- 存款曲线（最末） -->
+      <div class="card">
+        <h2><span id="icChart"></span> 存款曲线 · 你的自由进度</h2>
+        <div id="depositChart"></div>
+      </div>
+
+      <!-- （仪表盘不放 8 分类网格，移到记账页"支出"标签下方） -->
+    </section>
+
+    <!-- 记账 -->
+    <section class="view" id="view-record">
+      <div class="card">
+        <div class="tape"></div>
+        <h2><span id="icPen"></span> 10 秒记一笔</h2>
+        <div class="seg" id="dirSeg">
+          <button data-dir="out" class="on out">支出</button>
+          <button data-dir="in" class="in">收入</button>
+        </div>
+        <div style="height:14px"></div>
+
+        <!-- 内联「分类选择」：支出=8 网格 / 收入=4 chip；点哪个就是这笔的分类 -->
+        <div class="pickerWrap" id="pickerWrap">
+          <h2 class="pickerTitle" id="pickerTitle">
+            <span id="pickerIc"></span>
+            <span id="pickerTitleText">支出分类</span>
+          </h2>
+          <p class="muted" id="pickerHint" style="margin:-4px 0 12px">点哪个就是这笔的分类，下面只填金额和日期。</p>
+          <div id="pickerOut"><div id="expenseGrid"></div></div>
+          <div id="pickerIn" style="display:none"><div id="incomeChips"></div></div>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <label class="fld"><span class="t">金额（¥）</span>
+          <input type="number" id="amtInp" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+        </label>
+        <label class="fld"><span class="t">日期（可改成过去，补记往期收入）</span>
+          <input type="date" id="dateInp" style="font-size:16px">
+        </label>
+        <label class="fld" id="kfcHolidayRow" style="display:none; margin-top:-4px">
+          <span class="t" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink)">
+            <input type="checkbox" id="kfcHolidayChk" style="width:18px;height:18px;accent-color:var(--mint)"> 法定休假日班（¥48/时，非双休日周末）
+          </span>
+        </label>
+        <label class="fld"><span class="t">备注</span>
+          <input type="text" id="noteInp" placeholder="奶茶 / 午饭 / 房租…" maxlength="40">
+        </label>
+        <div class="convert" id="convertBox" style="display:none">
+          <span class="pig" id="pigConvert"></span>
+          <div>
+            <div class="big" id="convertBig">—</div>
+            <div class="sub" id="convertSub">先填金额，看看它值你多少个小时</div>
+          </div>
+        </div>
+        <div style="height:10px"></div>
+        <button class="btn" id="saveBtn">保存这笔</button>
+      </div>
+
+      <!-- （"支出分类"已并入上方"10 秒记一笔"卡片内，取代旧的"分类"下拉） -->
+
+      <div class="card">
+        <h2><span id="icList"></span> 全部流水 <span class="muted" id="txCount"></span>
+          <button id="toggleAll" class="linkbtn" style="float:right;font-size:12px">展开全部</button>
+        </h2>
+        <p class="muted" style="margin:-4px 0 12px;font-size:12px">按月份自动分组；当月默认展开，更早的折叠（点月份标题展开）。</p>
+        <div id="txList"><div class="skeleton">加载中…</div></div>
+      </div>
+    </section>
+
+    <!-- 真实时薪（含反推条） -->
+    <section class="view" id="view-hourly">
+      <div class="card">
+        <div class="tape"></div>
+        <h2><span id="icClock"></span> 真实时薪计算器</h2>
+        <p class="muted" style="margin:-4px 0 14px">工资不止看月薪——把成本、通勤、加班都算进去，才是你真正"卖"出去的每小时价钱。</p>
+        <div class="grid g2">
+          <label class="fld"><span class="t">综合到手月薪（¥）</span>
+            <input type="number" id="s_net" inputmode="decimal"></label>
+          <label class="fld"><span class="t">一年发薪月数</span>
+            <input type="number" id="s_pay" inputmode="numeric"></label>
+          <label class="fld"><span class="t">每月工作成本（饭/咖啡/杂费 ¥）</span>
+            <input type="number" id="s_cost" inputmode="decimal"></label>
+          <label class="fld"><span class="t">每天在场时间（小时）</span>
+            <input type="number" id="s_present" inputmode="decimal"></label>
+          <label class="fld"><span class="t">每天通勤时间（小时）</span>
+            <input type="number" id="s_commute" inputmode="decimal"></label>
+          <label class="fld"><span class="t">每月工作天数</span>
+            <input type="number" id="s_days" inputmode="numeric"></label>
+          <label class="fld"><span class="t">每月加班（小时）</span>
+            <input type="number" id="s_ot" inputmode="decimal"></label>
+          <label class="fld"><span class="t">当前存款 / 本金（¥）</span>
+            <input type="number" id="s_save" inputmode="decimal"></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="hourlyReset">恢复示例值</button>
+        </div>
+        <div class="convert" style="margin-top:14px">
+          <span class="pig" id="pigHourly"></span>
+          <div>
+            <div class="big" id="hourlyHeadline">¥0 / 小时</div>
+            <div class="sub" id="hourlySub">真实时薪 = 年净到手 ÷ 年总耗时</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span id="icSlider"></span> 反推：调整一下看时薪怎么变</h2>
+        <p class="muted" style="margin:-4px 0 14px">拖动滑块会同步更新上方输入并即时重算。涨薪分子、加时分母——谈薪永远是最划算的事。</p>
+        <div class="simrow">
+          <div class="sim"><div class="hd"><span id="icBus"></span> 通勤</div>
+            <div class="muted">每天 <b id="simCommuteVal">2.0</b> 小时</div>
+            <input type="range" id="simCommute" min="0" max="4" step="0.5" value="2"></div>
+          <div class="sim"><div class="hd"><span id="icOt"></span> 加班</div>
+            <div class="muted">每月 <b id="simOtVal">20</b> 小时</div>
+            <input type="range" id="simOt" min="0" max="120" step="5" value="20"></div>
+          <div class="sim"><div class="hd"><span id="icUp"></span> 涨薪</div>
+            <div class="muted">幅度 <b id="simRaiseVal">0</b> %</div>
+            <input type="range" id="simRaise" min="0" max="50" step="1" value="0"></div>
+        </div>
+        <div id="simCompare" style="margin-top:14px"></div>
+      </div>
+
+      <!-- 自由基金 & 安全垫（从仪表盘移到这里，靠近自由进度语义） -->
+      <div class="card">
+        <h2><span id="icTarget"></span> 自由基金 & 安全垫</h2>
+        <div id="fundRings"></div>
+      </div>
+    </section>
+
+    <!-- 情景模拟（旧 section 保留空容器，避免旧 SW 缓存命中时报错——下次发布清理） -->
+    <section class="view" id="view-simulate" style="display:none"></section>
+
+    <!-- 设置 -->
+    <section class="view" id="view-settings">
+      <div class="card">
+        <div class="tape"></div>
+        <h2><span id="icCloud"></span> 云端同步 · 手机 ↔ 网页</h2>
+        <div id="syncCard"></div>
+      </div>
+
+      <div class="card">
+        <div class="tape"></div>
+        <h2><span id="icTarget"></span> 自由基金 & 安全垫目标</h2>
+        <div class="grid g2">
+          <label class="fld"><span class="t">自由基金目标本金（¥）</span>
+            <input type="number" id="g_freedom" inputmode="decimal"></label>
+          <label class="fld"><span class="t">安全垫目标（¥）</span>
+            <input type="number" id="g_safety" inputmode="decimal"></label>
+          <label class="fld"><span class="t">年提取率（%）</span>
+            <input type="number" id="g_rate" inputmode="decimal"></label>
+          <label class="fld"><span class="t">当前存款 / 本金（¥）</span>
+            <input type="number" id="g_save" inputmode="decimal"></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="saveGoals">保存目标</button>
+        </div>
+        <p class="muted" style="margin-top:6px">自由基金 = 你不再出卖时间也能生活的"本金"；安全垫 = 3~6 个月开销的应急钱。</p>
+      </div>
+
+      <div class="card">
+        <div class="tape"></div>
+        <h2><span id="icCoin"></span> 收入组合来源</h2>
+        <p class="muted" style="margin:-4px 0 14px">把副业 / 兼职单价填好，记账换算更准。KFC 平时 ¥22/时；只有 <b>法定休假日</b>（春节 / 国庆 / 元旦 / 劳动节等法定节假日）才是 ¥48/时，<b>双休日周末不算</b>。</p>
+        <div class="grid g2">
+          <label class="fld"><span class="t">KFC 平时单价（¥/时）</span>
+            <input type="number" id="kfcNormal" inputmode="decimal"></label>
+          <label class="fld"><span class="t">KFC 法定休假日单价（¥/时）</span>
+            <input type="number" id="kfcHoliday" inputmode="decimal"></label>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="saveKfc">保存单价</button>
+        </div>
+        <div style="height:14px"></div>
+        <div class="tape" style="background:var(--mint)"></div>
+        <h2 style="margin-top:4px"><span id="icUp"></span> 一键导入收入表</h2>
+        <p class="muted" style="margin:-4px 0 12px">选你的《认证费用登记表》xlsx，自动把「每日服务费汇总」和「KFC」两个表生成本月收入流水，按日期去重、不重复导入。</p>
+        <div class="btn-row">
+          <button class="btn" id="importXlsxBtn">选择 Excel 文件导入</button>
+          <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none">
+        </div>
+        <div id="importLog" class="muted" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card">
+        <h2><span id="icShield"></span> 数据安全</h2>
+        <p class="muted" style="margin-top:-4px">当前为本地保存模式（数据存在本浏览器）。重连资料库后可升级为云端多设备同步。</p>
+        <div class="btn-row">
+          <button class="btn ghost" id="exportBtn">导出 JSON 备份</button>
+          <button class="btn ghost" id="importBtn">导入恢复</button>
+        </div>
+        <div style="height:10px"></div>
+        <button class="btn warn" id="clearBtn">清空示例 / 全部数据</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 底部Tab -->
+<nav class="bottomtab">
+  <div class="bt active" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
+  <div class="bt" data-view="record"><span id="icPen2"></span>记账</div>
+  <div class="bt" data-view="hourly"><span id="icClock2"></span>时薪</div>
+  <div class="bt" data-view="settings"><span id="icGear2"></span>设置</div>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3 id="mTitle">确认</h3>
+    <p id="mText">确定要执行吗？</p>
+    <div class="btn-row">
+      <button class="btn ghost" id="mCancel">取消</button>
+      <button class="btn warn" id="mOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="xlsx.full.min.js"></script>
+<script>
+/* =================== 图标（内联SVG，禁用emoji） =================== */
+const ICON = {
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/><path d="M10 19v-5h4v5"/></svg>',
+  pen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 9.5-9.5a2 2 0 0 0-3-3L5 16z"/><path d="M13.5 6.5l3 3"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  slider:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.2" fill="#fff"/><circle cx="8" cy="16" r="2.2" fill="#fff"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-5 3 3 4-6"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
+  list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1.3" fill="currentColor"/><circle cx="4" cy="12" r="1.3" fill="currentColor"/><circle cx="4" cy="18" r="1.3" fill="currentColor"/></svg>',
+  coin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9h3.2a2 2 0 0 1 0 4H10m0 0h3.5" stroke-linecap="round"/></svg>',
+  calc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M16 15v0M8 19h2M12 19h2"/></svg>',
+  bus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="13" rx="3"/><path d="M4 11h16M8 21v-2M16 21v-2"/><circle cx="8" cy="14" r="1" fill="currentColor"/><circle cx="16" cy="14" r="1" fill="currentColor"/></svg>',
+  ot:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 9.5-9.5a2 2 0 0 0-3-3L5 16z"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20z"/><path d="M12 9v5M12 17h0"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg>',
+  retry:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 5v6h-6"/></svg>',
+  /* 支出 8 分类图标（手绘奶油薄荷风） */
+  forkknife:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 0 0 4 0V3M9 11v10M16 3c-2 0-3 2-3 5s1 4 3 4v9"/></svg>',
+  car:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16h14M5 16l-1-4 2-5h12l2 5-1 4"/><circle cx="8" cy="18" r="1.6"/><circle cx="16" cy="18" r="1.6"/></svg>',
+  bag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+  game:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12c2 0 3 2 3 4v2a3 3 0 0 1-3 3 3 3 0 0 1-2-1l-1-1H9l-1 1a3 3 0 0 1-5 0v-4c0-2 1-4 3-4z"/><path d="M9 12h0M15 12h0M12 9v2M12 14v0"/><circle cx="9.5" cy="13.5" r="1" fill="currentColor"/><circle cx="15" cy="13" r="1" fill="currentColor"/></svg>',
+  house:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v9h14v-9"/><path d="M10 19v-5h4v5"/></svg>',
+  pill:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="9" width="18" height="6" rx="3" transform="rotate(-30 12 12)"/><path d="M9 6l6 6"/></svg>',
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2z"/><path d="M5 19a2 2 0 0 1 2-2h11"/></svg>',
+  tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 12 3h8v8l-9 9z"/><circle cx="16" cy="8" r="1.3" fill="currentColor"/></svg>'
+};
+
+/* 小猪存钱罐插画 */
+const PIG = (cls)=>`<svg class="${cls}" viewBox="0 0 120 104" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="60" cy="92" rx="34" ry="6" fill="#E9DCC6"/>
+  <path d="M30 58c0-20 14-34 32-34s30 12 32 30c1 9-2 18-9 24-3 9-12 13-23 13s-20-4-23-13c-7-6-10-15-9-24z" fill="#F7C6C0" stroke="#EFA59C" stroke-width="2"/>
+  <path d="M22 52c-6-3-10-9-9-15 4 1 8 4 10 9z" fill="#F7C6C0" stroke="#EFA59C" stroke-width="2"/>
+  <path d="M88 30c4-7 11-9 16-7-1 5-4 10-9 13z" fill="#F7C6C0" stroke="#EFA59C" stroke-width="2"/>
+  <ellipse cx="46" cy="60" rx="6" ry="7" fill="#FBE3DA" stroke="#EFA59C" stroke-width="1.6"/>
+  <ellipse cx="44.5" cy="60" rx="2" ry="2.6" fill="#5B5249"/>
+  <circle cx="74" cy="50" r="2.4" fill="#5B5249"/>
+  <path d="M82 60c6 0 10 3 10 7" fill="none" stroke="#EFA59C" stroke-width="2" stroke-linecap="round"/>
+  <rect x="52" y="34" width="18" height="4.5" rx="2.2" fill="#5B5249" transform="rotate(-4 61 36)"/>
+  <path d="M34 78c8 6 44 6 52 0" fill="none" stroke="#EFA59C" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+  <ellipse cx="60" cy="58" rx="3" ry="2" fill="#EFA59C"/>
+  <circle cx="98" cy="40" r="6" fill="#9FE0C4" stroke="#56B98C" stroke-width="1.6"/>
+  <text x="98" y="44" font-size="9" font-weight="700" fill="#56B98C" text-anchor="middle">¥</text>
+</svg>`;
+
+/* =================== 状态 & 默认设置 =================== */
+const DEFAULT_SETTINGS = {
+  netMonthly:8000, payMonths:12, workCostMonthly:1500,
+  presentHoursDay:9, commuteHoursDay:2, workDaysMonth:22, overtimeHoursMonth:20,
+  currentSavings:80000, freedomGoal:1500000, safetyGoal:100000, withdrawRate:4,
+  kfcRateNormal:22, kfcRateHoliday:48
+};
+const CATS = {
+  in:['KFC兼职','认证服务费','外卖','其他收入'],
+  out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],
+  out_elastic:['餐饮','交通','购物','娱乐','居住','医疗','学习','其他']
+};
+
+let S = { settings:null, tx:[], error:null, ready:false };
+
+/* =================== 数据层（本地 / GitHub Gist） ===================
+   同步策略：本地 localStorage（默认） + 可选 GitHub Gist 跨设备同步
+   - local: 浏览器 localStorage（默认，零配置）
+   - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
+const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
+const ONLINE_ENDPOINT='';
+const DEFAULT_TOKEN_DAYS = 90;            // 默认 90 天
+const TOKEN_WARN_DAYS = 7;               // 到期前 N 天开始提醒
+const DAY_MS = 86400000;
+/* ============ GitHub Gist 云端同步（与工作台/学习台/计算器一致） ============ */
+const GIST_FILE='ledger-data.json';
+var gist={enabled:false,token:'',gistId:'',_t:null,_retry:null,_lastOk:0};
+try{ var _g=JSON.parse(localStorage.getItem(KEY_SYNC)||'{}'); gist.enabled=!!_g.enabled; gist.token=_g.token||''; gist.gistId=_g.gistId||''; }catch(e){}
+function saveSyncCfg(){ localStorage.setItem(KEY_SYNC, JSON.stringify({enabled:gist.enabled,token:gist.token,gistId:gist.gistId})); }
+function syncStatus(msg,cls){ var el=document.getElementById('syncStatus'); if(!el)return; el.textContent=msg||''; el.className='sync-status'+(cls?' '+cls:''); }
+function gistPayload(){ return JSON.stringify({ v:1, updatedAt:Date.now(), settings:S.settings, tx:S.tx }); }
+function makeFiles(body){ var o={}; o[GIST_FILE]={content:body}; return o; }
+async function gistReq(method,id,body){
+  var url=id?('https://api.github.com/gists/'+id):'https://api.github.com/gists';
+  var opt={method:method,headers:{'Authorization':'Bearer '+gist.token,'Content-Type':'application/json','Accept':'application/vnd.github+json'}};
+  if(body)opt.body=JSON.stringify(body);
+  var r=await fetch(url,opt);
+  if(r.status===401)throw new Error('GitHub 401 · Token 已失效，请重新生成带 gist 权限的新 Token');
+  if(r.status===403)throw new Error('GitHub 403 · Token 缺少 gist 权限，请重新生成时勾选 gist');
+  if(!r.ok)throw new Error('GitHub '+r.status);
+  return r.json();
+}
+async function pushGist(){
+  if(!gist.enabled||!gist.token)return;
+  try{
+    var body=gistPayload();
+    if(!gist.gistId){
+      var g=await gistReq('POST',null,{description:'打工人小账本数据同步',public:false,files:makeFiles(body)});
+      gist.gistId=g.id; saveSyncCfg();
+    } else {
+      await gistReq('PATCH',gist.gistId,{files:makeFiles(body)});
+    }
+    showGistInfo();
+    syncStatus('已同步 '+new Date().toLocaleTimeString(),'ok');
+    gist._lastOk=Date.now();
+    if(gist._retry){ clearInterval(gist._retry); gist._retry=null; }
+  }catch(e){
+    if(/40[13]/.test(e&&e.message||'')){ if(gist._retry){clearInterval(gist._retry);gist._retry=null;} syncStatus('⚠️ '+(e.message||'同步失败')+'（请更新 Token）','err'); return; }
+    syncStatus((typeof navigator!=='undefined'&&navigator.onLine===false)?'离线，联网后上传':'同步失败，将自动重试：'+(e&&e.message?e.message:e),'warn');
+    startGistRetry();
+  }
+}
+function startGistRetry(){ if(gist._retry)return; gist._retry=setInterval(function(){ if(!gist.enabled||!gist.token){clearInterval(gist._retry);gist._retry=null;return;} pushGist(); },6000); }
+function showGistInfo(){
+  var el=document.getElementById('syncGistInfo'); if(!el)return;
+  el.innerHTML=gist.gistId?('已绑定私有 Gist：<a href="https://gist.github.com/'+gist.gistId+'" target="_blank" rel="noopener">'+gist.gistId+'</a><br>两台设备用<b>相同 Token + 此 ID</b> 即共享同一份数据。'):'';
+}
+function schedulePush(){ if(!gist.enabled||!gist.token)return; clearTimeout(gist._t); gist._t=setTimeout(pushGist,800); }
+function mergeById(local,incoming,key){
+  key=key||'id'; var map={};
+  (local||[]).forEach(function(x){ if(x&&x[key]!=null)map[x[key]]=x; });
+  (incoming||[]).forEach(function(x){ if(x&&x[key]!=null){ if(map[x[key]])Object.assign(map[x[key]],x); else map[x[key]]=x; } });
+  return Object.keys(map).map(function(k){return map[k];});
+}
+async function pullGist(silent){
+  if(!gist.enabled||!gist.token||!gist.gistId)return;
+  try{
+    var g=await gistReq('GET',gist.gistId);
+    var f=g.files&&g.files[GIST_FILE]; if(!f||!f.content)return;
+    var d=JSON.parse(f.content);
+    var before=JSON.stringify({s:S.settings,t:S.tx});
+    if(d.settings) S.settings=Object.assign(clone(DEFAULT_SETTINGS), d.settings);
+    if(Array.isArray(d.tx)) S.tx=mergeById(S.tx,d.tx);
+    var after=JSON.stringify({s:S.settings,t:S.tx});
+    if(before!==after){
+      try{ localStorage.setItem(KEY_SET,JSON.stringify(S.settings)); localStorage.setItem(KEY_TX,JSON.stringify(S.tx)); }catch(_){}
+      var ae=document.activeElement;
+      var typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA');
+      if(!typing) renderAll();
+    }
+    gist._lastOk=Date.now();
+    if(!silent) syncStatus('已拉取 '+new Date().toLocaleTimeString(),'ok');
+  }catch(e){
+    if(/40[13]/.test(e&&e.message||'')){ if(gist._retry){clearInterval(gist._retry);gist._retry=null;} syncStatus('⚠️ '+(e.message||'拉取失败')+'（请更新 Token）','err'); return; }
+    if(!silent) syncStatus('拉取失败：'+(e&&e.message?e.message:e),'err');
+  }
+}
+async function syncNow(){ if(!gist.enabled||!gist.token){ syncStatus('请先启用同步','err'); return; } syncStatus('同步中…'); await pullGist(); await pushGist(); }
+var _autoPull=null;
+function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },45000); }
+function gistEnable(){
+  var tok=document.getElementById('syncToken').value.trim();
+  var gid=document.getElementById('syncGistId').value.trim();
+  if(!tok){ toast('请输入 Token'); return; }
+  gist.token=tok; gist.gistId=gid; gist.enabled=true; saveSyncCfg();
+  pushGist().then(function(){ gistInit(); toast('已启用并同步 ✅'); }).catch(function(e){ toast(e.message); });
+}
+function gistDisable(){
+  if(!confirm('断开后数据仍保留在本地和 Gist 中。确定断开？')) return;
+  gist.enabled=false; gist.token=''; gist.gistId=''; saveSyncCfg();
+  gistInit(); toast('已断开云端同步');
+}
+function gistInit(){
+  renderSyncCard();
+  if(gist.enabled && gist.token){
+    startAutoPull();
+    pullGist(true);
+  }
+}
+const Store={
+  async loadAll(){
+    const set=JSON.parse(localStorage.getItem(KEY_SET)||'null');
+    const tx=JSON.parse(localStorage.getItem(KEY_TX)||'null');
+    if(set===null && tx===null){ const seed=seedData(); localStorage.setItem(KEY_SET,JSON.stringify(seed.settings)); localStorage.setItem(KEY_TX,JSON.stringify(seed.tx)); return seed; }
+    return { settings: set||clone(DEFAULT_SETTINGS), tx: tx||[] };
+  },
+  async persist(){
+    localStorage.setItem(KEY_SET, JSON.stringify(S.settings));
+    localStorage.setItem(KEY_TX, JSON.stringify(S.tx));
+    if(gist.enabled && gist.token) schedulePush();
+    return 'local';
+  }
+};
+
+function seedData(){
+  const s = clone(DEFAULT_SETTINGS);
+  const d = (n)=>{ const x=new Date(); x.setHours(12,0,0,0); x.setDate(x.getDate()-n); return x.getTime(); };
+  const tx = [
+    {id:uid(), ts:d(4), direction:'in', group:'income', category:'工资', amount:8000, note:'八月工资到手'},
+    {id:uid(), ts:d(4), direction:'out', group:'fixed', category:'房租/房贷', amount:2500, note:'八月房租'},
+    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'餐饮', amount:32, note:'午饭+咖啡'},
+    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'购物', amount:199, note:'日用品补货'}
+  ];
+  return { settings:s, tx };
+}
+function uid(){ return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* =================== 工具 =================== */
+const clone = (o)=> JSON.parse(JSON.stringify(o));
+const fmt = (n)=> '¥'+ (Math.round(n*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});
+const fmt0 = (n)=> '¥'+ Math.round(n).toLocaleString('zh-CN');
+const fmt2 = (n)=> '¥'+ (Math.round(n*100)/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = (a,b)=> b>0? Math.max(0,Math.round(a/b*100)) : 0;
+function dateOnly(ts){ const d=new Date(ts); const p=(x)=>String(x).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function monthKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1900); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function calcHourly(s){
+  const annualTake = s.netMonthly * s.payMonths;
+  const annualCost = s.workCostMonthly * 12;
+  const annualNet = annualTake - annualCost;
+  const dailyHours = (Number(s.presentHoursDay)||0) + (Number(s.commuteHoursDay)||0);
+  const annualHours = dailyHours * (Number(s.workDaysMonth)||0) * 12 + (Number(s.overtimeHoursMonth)||0) * 12;
+  const hourly = annualHours>0 ? annualNet/annualHours : 0;
+  return { annualTake, annualCost, annualNet, dailyHours, annualHours, hourly };
+}
+
+/* =================== 同步状态 =================== */
+let syncUi=null;
+function setSync(state, text){
+  syncUi={state,text};
+  const box=document.getElementById('syncBox');
+  if(!box) return;
+  box.className='sync '+state;
+  document.getElementById('syncText').textContent=text;
+  document.getElementById('syncRetry').style.display = (state==='err')?'inline-block':'none';
+}
+
+/* =================== 渲染：图标占位（同 id 多元素都填，避免重复 id 漏渲染） =================== */
+function paintIcons(){
+  const map={icHome:'home',icPen:'pen',icClock:'clock',icSlider:'slider',icGear:'gear',icBell:'bell',
+    icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield'};
+  for(const id in map){
+    const html = ICON[map[id]];
+    document.querySelectorAll('#'+id).forEach(el=>el.innerHTML=html);
+  }
+  // 底部 Tab 图标（已删"模拟" Tab，所以不写 icSlider2）—— 所有调用统一加 null 保护
+  const tabIcons={icHome2:'home',icPen2:'pen',icClock2:'clock',icGear2:'gear'};
+  for(const id in tabIcons){ document.querySelectorAll('#'+id).forEach(el=>el.innerHTML=ICON[tabIcons[id]]); }
+  // 小猪插画占位（可能因版本调整被删除，统一 null 保护）
+  const pigs={pigSide:'',pigConvert:'',pigHourly:''};
+  for(const id in pigs){ const el=document.getElementById(id); if(el) el.innerHTML=PIG(pigs[id]); }
+}
+
+/* =================== 视图切换 =================== */
+const TITLES={dashboard:'仪表盘',record:'10秒记账',hourly:'真实时薪',simulate:'情景模拟',settings:'我的设置'};
+function switchView(v){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
+  document.querySelectorAll('.bt').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  document.getElementById('pageTitle').textContent=TITLES[v];
+  if(v==='record'){ renderExpenseGrid(); renderIncomeChips(); syncPickerArea(); }
+  if(v==='hourly'){ fillHourlyInputs(); syncSimSliders(); renderFundRings(); }
+  if(v==='settings'){ fillGoalInputs(); fillKfcInputs(); renderSyncCard(); }
+  window.scrollTo(0,0);
+}
+
+/* 自由基金 & 安全垫（仅渲染到时薪视图的 #fundRings） */
+function renderFundRings(){
+  const el=document.getElementById('fundRings');
+  if(!el) return;
+  const s=S.settings;
+  el.innerHTML = `
+    <div class="ring-wrap" style="margin-bottom:16px">
+      ${ringSVG(pct(s.currentSavings,s.freedomGoal), fmt0(s.currentSavings), '自由基金')}
+      <div class="ring-info"><div class="t">自由基金</div><div class="d">目标 ${fmt0(s.freedomGoal)}<br>还差 ${fmt0(Math.max(0,s.freedomGoal-s.currentSavings))}</div></div>
+    </div>
+    <div class="ring-wrap">
+      ${ringSVG(pct(s.currentSavings,s.safetyGoal), fmt0(s.currentSavings), '安全垫')}
+      <div class="ring-info"><div class="t">安全垫</div><div class="d">目标 ${fmt0(s.safetyGoal)}<br>${s.currentSavings>=s.safetyGoal?'已达成 ✓':('还差 '+fmt0(s.safetyGoal-s.currentSavings))}</div></div>
+    </div>`;
+}
+
+/* =================== 仪表盘 =================== */
+function renderDashboard(){
+  const s=S.settings, tx=S.tx;
+  const h=calcHourly(s);
+  // 今日待处理
+  const today=dateOnly(Date.now());
+  const hasToday=tx.some(t=>dateOnly(t.ts)===today);
+  const todos=[];
+  if(!hasToday) todos.push({overdue:false,title:'今天还没记账哦',sub:'记一笔，看看它值你多少个小时',act:'去记账',view:'record'});
+  if(todos.length===0) todos.push({overdue:false,title:'今天都搞定啦',sub:'保持节奏，自由一点点靠近',act:'记一笔',view:'record'});
+  document.getElementById('todoList').innerHTML = todos.map(t=>`
+    <div class="todo-item ${t.overdue?'overdue':''}">
+      <span class="ic">${ICON[t.overdue?'warn':'check']}</span>
+      <span class="txt"><b>${escapeHtml(t.title)}</b>${escapeHtml(t.sub)}</span>
+      <button class="act" data-go="${t.view}">${escapeHtml(t.act)}</button>
+    </div>`).join('');
+  document.querySelectorAll('#todoList .act').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='record') switchView('record'); });
+
+  // 统计块
+  const mk = monthKey(Date.now());
+  const cur = tx.filter(t=>monthKey(t.ts)===mk);
+  const inc = cur.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
+  const fixed = cur.filter(t=>t.group==='fixed').reduce((a,t)=>a+t.amount,0);
+  const elas = cur.filter(t=>t.group==='elastic').reduce((a,t)=>a+t.amount,0);
+  const bal = inc - fixed - elas;
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat"><div class="lab">${ICON.coin} 真实时薪</div><div class="val mint">${fmt0(h.hourly)}<small>/时</small></div></div>
+    <div class="stat"><div class="lab">${ICON.coin} 本月收入</div><div class="val in">${fmt2(inc)}</div></div>
+    <div class="stat"><div class="lab">${ICON.list} 本月固定支出</div><div class="val out">${fmt0(fixed)}</div></div>
+    <div class="stat"><div class="lab">${ICON.chart} 本月结余</div><div class="val ${bal>=0?'mint':'out'}">${fmt2(bal)}</div></div>`;
+
+  // 存款曲线
+  document.getElementById('depositChart').innerHTML = depositChartSVG(tx, s.currentSavings);
+
+  // 仪表盘新模块：月度结算条 + 支出三件套 + 快记 8 网格
+  renderMonthlySettlement();
+  renderExpenseMix();
+  renderExpenseTrend();
+  renderExpenseRank();
+  renderIncomeMix();
+}
+
+/* =================== 收入组合占比 =================== */
+function renderIncomeMix(){
+  const el=document.getElementById('incomeMix');
+  if(!el) return;
+  const totals={}; let sum=0;
+  S.tx.filter(t=>t.direction==='in').forEach(t=>{
+    const c=t.category||'其他收入'; const v=Number(t.amount)||0;
+    totals[c]=(totals[c]||0)+v; sum+=v;
+  });
+  if(sum<=0){ el.innerHTML='<div class="muted">还没有收入记录～记一笔收入，或去设置页导入你的收入表吧。</div>'; return; }
+  const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const colors=['#56B98C','#7FC8A9','#F2B5A6','#E8A87C','#9FD8CB','#C9B8E0','#F7D08A'];
+  const R=46, C=2*Math.PI*R; let off=0;
+  const arcs=entries.map((e,i)=>{
+    const frac=e[1]/sum, len=frac*C, col=colors[i%colors.length];
+    const seg=`<circle cx="60" cy="60" r="${R}" fill="none" stroke="${col}" stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${(C-len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 60 60)"/>`;
+    off+=len; return seg;
+  }).join('');
+  const legend=entries.map((e,i)=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px">
+    <span style="width:10px;height:10px;border-radius:50%;background:${colors[i%colors.length]};flex:none"></span>
+    <span style="flex:1;color:var(--ink)">${escapeHtml(e[0])}</span>
+    <span style="color:var(--ink-soft);font-variant-numeric:tabular-nums">${fmt2(e[1])} · ${Math.round(e[1]/sum*100)}%</span>
+  </div>`).join('');
+  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+    <div style="position:relative;width:120px;height:120px;flex:none">
+      <svg viewBox="0 0 120 120" style="width:120px;height:120px">
+        <circle cx="60" cy="60" r="${R}" fill="none" stroke="#EAE0CF" stroke-width="15"/>
+        ${arcs}
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div style="font-weight:800;font-size:15px;color:var(--ink)">${fmt2(sum)}</div>
+        <div style="font-size:11px;color:var(--ink-soft)">总收入</div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:170px;display:flex;flex-direction:column;gap:7px">${legend}</div>
+  </div>`;
+}
+
+/* ===== 仪表盘新模块：月度结算 + 支出三件套 + 快记 8 网格 ===== */
+
+/* 仪表盘当前查看的月份（含 "全部"，按用户操作切换；本会话缓存） */
+const SET_VIEW_MONTH = 'wb_ledger_viewmonth_v1';
+let VIEW_MONTH = (function(){
+  try{ const v = localStorage.getItem(SET_VIEW_MONTH); if(v && (/^\d{4}-\d{2}$/.test(v) || v==='全部')) return v; }catch(_){}
+  return monthKey(Date.now());
+})();
+function setViewMonth(m){
+  VIEW_MONTH = m;
+  try{ localStorage.setItem(SET_VIEW_MONTH, m); }catch(_){}
+  // 刷新受影响区域
+  renderMonthlySettlement();
+  renderExpenseMix();
+  renderExpenseTrend();
+  renderExpenseRank();
+}
+
+/* 月度结算条：自动 8月/9月/全部 + 收入 − 支出 = 结余 */
+function renderMonthlySettlement(){
+  const seg = document.getElementById('monthSeg');
+  const box = document.getElementById('monthSettlement');
+  if(!seg || !box) return;
+  // 自动生成月份 chips：当前月 + 数据中所有月份 + "全部"（去重，去未来月）
+  const cur = monthKey(Date.now());
+  const mset = new Set();
+  mset.add(cur);
+  S.tx.forEach(t=>{ if(t.ts) mset.add(monthKey(t.ts)); });
+  const months = Array.from(mset).filter(m=>m<=cur).sort(); // 正序
+  const chips = [...months, '全部'];
+  if(!chips.includes(VIEW_MONTH)) VIEW_MONTH = cur;
+  seg.innerHTML = chips.map(m=>{
+    const on = m===VIEW_MONTH;
+    const label = m==='全部' ? '全部' : (m===cur ? '本月' : (Number(m.split('-')[1])+'月'));
+    return `<button data-m="${m}" class="${on?'on':''}">${label}</button>`;
+  }).join('');
+  seg.querySelectorAll('button').forEach(b=>{
+    b.onclick = ()=>{
+      const m = b.dataset.m;
+      setViewMonth(m);
+      seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.m===m));
+    };
+  });
+  // 选定月份汇总
+  const filtered = VIEW_MONTH==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===VIEW_MONTH);
+  const inc = filtered.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
+  const out = filtered.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  const bal = inc - out;
+  const cnt = filtered.length;
+  const incN = filtered.filter(t=>t.direction==='in').length;
+  const outN = filtered.filter(t=>t.direction==='out').length;
+  if(cnt === 0){
+    box.innerHTML = `<div class="muted" style="padding:22px 0;text-align:center">${VIEW_MONTH==='全部'?'还没有任何流水～点底部"记账"开始你的第一笔':'该月还没有数据，录一笔试试～'}</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="settle-row">
+      <div class="settle-item"><div class="lab">收入</div><div class="val in">${fmt2(inc)}</div><div class="sub">${incN} 笔</div></div>
+      <div class="settle-op">−</div>
+      <div class="settle-item"><div class="lab">支出</div><div class="val out">${fmt2(out)}</div><div class="sub">${outN} 笔</div></div>
+      <div class="settle-op">=</div>
+      <div class="settle-item settle-final"><div class="lab">结余</div><div class="val ${bal>=0?'mint':'out'}">${fmt2(bal)}</div><div class="sub">${bal>=0?'攒下了':'超支'}</div></div>
+    </div>
+    <div class="settle-meta">${VIEW_MONTH==='全部'?'所有月份累计':'仅 '+VIEW_MONTH } · 共 ${cnt} 笔 · 支出率 ${inc>0?Math.round(out/inc*100):0}%</div>`;
+}
+
+/* 支出分类 8 大类（图表色彩 + 图标），老分类别名 → 新图标的兜底映射 */
+const EXP_CAT = {
+  '餐饮':{icon:'forkknife',col:'#F2B5A6'},
+  '交通':{icon:'car',col:'#7FC8A9'},
+  '购物':{icon:'bag',col:'#E8A87C'},
+  '娱乐':{icon:'game',col:'#C9B8E0'},
+  '居住':{icon:'house',col:'#56B98C'},
+  '医疗':{icon:'pill',col:'#F7A8A8'},
+  '学习':{icon:'book',col:'#9FD8CB'},
+  '其他':{icon:'tag',col:'#EAE0CF'},
+  /* 老数据 group=fixed 类映射 */
+  '房租/房贷':{icon:'house',col:'#56B98C'},
+  '水电煤':{icon:'house',col:'#56B98C'},
+  '话费':{icon:'car',col:'#7FC8A9'},
+  '保险':{icon:'tag',col:'#EAE0CF'},
+  '订阅':{icon:'tag',col:'#EAE0CF'},
+};
+const EXP_CAT_ORDER = ['餐饮','交通','购物','娱乐','居住','医疗','学习','其他'];
+
+/* 计算支出分类汇总 */
+function expenseTotalsByMonth(month){
+  const src = month==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===month && t.direction==='out');
+  const map = {}; let sum = 0;
+  src.forEach(t=>{
+    const c = t.category || '其他';
+    const v = Number(t.amount)||0;
+    map[c] = (map[c]||0) + v; sum += v;
+  });
+  return {map, sum, sorted: Object.entries(map).sort((a,b)=>b[1]-a[1])};
+}
+
+/* 支出分类占比甜甜圈 */
+function renderExpenseMix(){
+  const el = document.getElementById('expenseMix');
+  if(!el) return;
+  const {map, sum, sorted} = expenseTotalsByMonth(VIEW_MONTH);
+  if(sum <= 0){
+    el.innerHTML = `<div class="muted">${VIEW_MONTH==='全部'?'还没有支出记录～':'该月还没有支出～'}</div>`;
+    return;
+  }
+  const R = 50, C = 2*Math.PI*R, colors = ['#F2B5A6','#7FC8A9','#E8A87C','#C9B8E0','#56B98C','#F7A8A8','#9FD8CB','#EAE0CF'];
+  let off = 0;
+  const arcs = sorted.map((e,i)=>{
+    const frac = e[1]/sum, len = frac*C;
+    const col = (EXP_CAT[e[0]] && EXP_CAT[e[0]].col) || colors[i%colors.length];
+    const seg = `<circle cx="65" cy="65" r="${R}" fill="none" stroke="${col}" stroke-width="16" stroke-dasharray="${len.toFixed(1)} ${(C-len).toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 65 65)"/>`;
+    off += len; return seg;
+  }).join('');
+  const legend = sorted.map(e=>{
+    const col = (EXP_CAT[e[0]] && EXP_CAT[e[0]].col) || '#EAE0CF';
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:2px 0">
+      <span style="width:10px;height:10px;border-radius:50%;background:${col};flex:none"></span>
+      <span style="flex:1;color:var(--ink)">${escapeHtml(e[0])}</span>
+      <span style="color:var(--ink-soft);font-variant-numeric:tabular-nums">${fmt2(e[1])} · ${Math.round(e[1]/sum*100)}%</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+    <div style="position:relative;width:130px;height:130px;flex:none">
+      <svg viewBox="0 0 130 130" style="width:130px;height:130px">
+        <circle cx="65" cy="65" r="${R}" fill="none" stroke="#EAE0CF" stroke-width="16"/>
+        ${arcs}
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div style="font-weight:800;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums">${fmt2(sum)}</div>
+        <div style="font-size:11px;color:var(--ink-soft)">支出总额</div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:180px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px">${legend}</div>
+  </div>`;
+}
+
+/* 近 7 天支出柱状图 */
+function renderExpenseTrend(){
+  const el = document.getElementById('expenseTrend');
+  if(!el) return;
+  // 取 VIEW_MONTH 范围内最近 7 天，或"全部"时取全局最近 7 天
+  const days = [];
+  const labels = ['日','一','二','三','四','五','六'];
+  const today = new Date(); const todayMid = new Date(today.getFullYear(),today.getMonth(),today.getDate()).getTime();
+  for(let i=6;i>=0;i--){
+    const ts = todayMid - i*86400000;
+    // 限定在 VIEW_MONTH 月份内（仅本月/上月有效，全部不限）
+    const tsM = monthKey(ts);
+    const inScope = VIEW_MONTH==='全部' || tsM===VIEW_MONTH;
+    const tx = inScope
+      ? S.tx.filter(t=>t.direction==='out' && dateOnly(t.ts)===dateOnly(ts))
+      : [];
+    const v = tx.reduce((a,t)=>a+t.amount,0);
+    days.push({ts, label: labels[new Date(ts).getDay()], v, isToday: i===0, inScope});
+  }
+  const inScopeDays = days.filter(d=>d.inScope);
+  const scopeTotal = inScopeDays.reduce((a,d)=>a+d.v,0);
+  if(scopeTotal <= 0){
+    el.innerHTML = `<div class="muted">${VIEW_MONTH==='全部'?'近 7 天还没支出～':'该月近 7 天没支出～'}</div>`;
+    return;
+  }
+  const max = Math.max(...days.map(d=>d.v), 1);
+  const W=350, H=130, padL=28, padR=8, padT=16, padB=24;
+  const colW = (W - padL - padR) / 7 - 6;
+  const bars = days.map((d,i)=>{
+    const h = d.v>0 ? Math.max(8, (H-padT-padB)*(d.v/max)) : 0;
+    const x = padL + i*((W-padL-padR)/7) + 3;
+    const y = H - padB - h;
+    const col = !d.inScope ? '#F1ECDF' : (d.isToday?'#F2B5A6':'#9FD8CB');
+    const op = (d.v>0 && d.inScope) ? 1 : 0.35;
+    return `
+      <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${colW.toFixed(1)}" height="${h.toFixed(1)}" rx="5" fill="${col}" opacity="${op}"/>
+      <text x="${(x+colW/2).toFixed(1)}" y="${y-3}" font-size="9" fill="#5B5249" text-anchor="middle" font-family="monospace">${(d.v>0 && d.inScope)?'¥'+fmt0(d.v):'—'}</text>
+      <text x="${(x+colW/2).toFixed(1)}" y="${H-padB+14}" font-size="10" fill="#7B7468" text-anchor="middle">${d.label}</text>`;
+  }).join('');
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:420px">${bars}</svg>
+    <div class="muted" style="margin-top:6px;font-size:12px">近 7 天共支出 <b style="color:var(--ink-deep)">${fmt2(scopeTotal)}</b>，今天 ${fmt2(days[6].v)}</div>`;
+}
+
+/* 支出排行榜 Top 5 */
+function renderExpenseRank(){
+  const el = document.getElementById('expenseRank');
+  if(!el) return;
+  const {map, sum, sorted} = expenseTotalsByMonth(VIEW_MONTH);
+  const top = sorted.slice(0,5);
+  if(top.length === 0){
+    el.innerHTML = '<div class="muted">还没有支出记录</div>';
+    return;
+  }
+  const max = top[0][1];
+  el.innerHTML = top.map((e,i)=>{
+    const cfg = EXP_CAT[e[0]] || {icon:'tag',col:'#EAE0CF'};
+    const pctW = max>0 ? Math.round(e[1]/max*100) : 0;
+    const pctTotal = sum>0 ? Math.round(e[1]/sum*100) : 0;
+    return `
+      <div class="rank-row">
+        <div class="rank-no ${i<3?'top':''}">${i+1}</div>
+        <div class="rank-ico" style="background:${cfg.col}33;color:${cfg.col}">${ICON[cfg.icon]||ICON.tag}</div>
+        <div class="rank-body">
+          <div class="rank-line"><span class="rank-name">${escapeHtml(e[0])}</span><span class="rank-amt">${fmt2(e[1])}</span></div>
+          <div class="rank-bar"><div class="rank-fill" style="width:${pctW}%;background:${cfg.col}"></div></div>
+        </div>
+        <div class="rank-pct">${pctTotal}%</div>
+      </div>`;
+  }).join('');
+}
+
+/* 支出分类 8 网格（内联在"10 秒记一笔"卡片内，紧跟切换按钮）
+   行为：点哪个 → pickedCat={c,g=elastic|c} → 高亮当前选中 → toggleKfcHolidayRow → updateConvert → 滚到金额框聚焦 */
+function renderExpenseGrid(){
+  const el = document.getElementById('expenseGrid');
+  if(!el) return;
+  const cats = [
+    {name:'餐饮',icon:'forkknife',col:'#F2B5A6'},
+    {name:'交通',icon:'car',col:'#7FC8A9'},
+    {name:'购物',icon:'bag',col:'#E8A87C'},
+    {name:'娱乐',icon:'game',col:'#C9B8E0'},
+    {name:'居住',icon:'house',col:'#56B98C'},
+    {name:'医疗',icon:'pill',col:'#F7A8A8'},
+    {name:'学习',icon:'book',col:'#9FD8CB'},
+    {name:'其他',icon:'tag',col:'#EAE0CF'},
+  ];
+  el.innerHTML = `<div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${c.name}" data-group="elastic">
+    <span class="exp-ico" style="background:${c.col}26;color:${c.col}">${ICON[c.icon]||ICON.tag}</span>
+    <span class="exp-name">${c.name}</span>
+  </button>`).join('')}</div>`;
+  el.querySelectorAll('.exp-cell').forEach(b=>{
+    b.onclick = ()=>{
+      pickedCat = { c: b.dataset.cat, g: b.dataset.group };
+      highlightPicker();
+      toggleKfcHolidayRow();
+      updateConvert();
+      const main = document.querySelector('.main') || document.body;
+      main.scrollTop = 0;
+      window.scrollTo(0,0);
+      setTimeout(()=>document.getElementById('amtInp')?.focus(), 60);
+      toast(`已选「${pickedCat.c}」，填金额保存即可`);
+    };
+  });
+  // 高亮当前 pickedCat（如有）
+  highlightPicker();
+}
+
+/* 收入分类 4 chip（在同一个 picker 区域里，支出标签下隐藏） */
+function renderIncomeChips(){
+  const el = document.getElementById('incomeChips');
+  if(!el) return;
+  const cats = CATS.in; // ['KFC兼职','认证服务费','外卖','其他收入']
+  el.innerHTML = `<div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${escapeHtml(c)}" data-group="income">
+    <span class="exp-ico" style="background:#7FC8A926;color:#56B98C">${ICON.coin||ICON.tag}</span>
+    <span class="exp-name">${escapeHtml(c)}</span>
+  </button>`).join('')}</div>`;
+  el.querySelectorAll('.exp-cell').forEach(b=>{
+    b.onclick = ()=>{
+      pickedCat = { c: b.dataset.cat, g: 'income' };
+      highlightPicker();
+      toggleKfcHolidayRow();
+      updateConvert();
+      const main = document.querySelector('.main') || document.body;
+      main.scrollTop = 0;
+      window.scrollTo(0,0);
+      setTimeout(()=>document.getElementById('amtInp')?.focus(), 60);
+      toast(`已选「${pickedCat.c}」，填金额保存即可`);
+    };
+  });
+  highlightPicker();
+}
+
+/* 高亮当前 pickedCat 对应的 cell */
+function highlightPicker(){
+  document.querySelectorAll('#expenseGrid .exp-cell, #incomeChips .exp-cell').forEach(b=>{
+    const on = (b.dataset.cat===pickedCat.c);
+    b.classList.toggle('on', on);
+  });
+}
+
+/* 切换支出/收入：显隐 picker 子区、更新标题与提示；
+   切到标签时若 pickedCat.g 与新方向不匹配，则把 pickedCat 重置为该方向下第一个分类。 */
+function syncPickerArea(){
+  const out=document.getElementById('pickerOut');
+  const inn=document.getElementById('pickerIn');
+  const t=document.getElementById('pickerTitleText');
+  const h=document.getElementById('pickerHint');
+  const ic=document.getElementById('pickerIc');
+  if(curDir==='out'){
+    out.style.display='';
+    inn.style.display='none';
+    t.textContent='支出分类';
+    h.textContent='点哪个就是这笔的分类，下面只填金额和日期。';
+    ic.innerHTML = ICON.pen;
+    // 若 pickedCat 是收入分类，重置为支出默认「餐饮」
+    if(pickedCat.g==='income'){
+      pickedCat = {c:'餐饮', g:'elastic'};
+    }
+  }else{
+    out.style.display='none';
+    inn.style.display='';
+    t.textContent='收入分类';
+    h.textContent='点哪个就是这笔的来源，下面只填金额和日期。';
+    ic.innerHTML = ICON.coin;
+    // 若 pickedCat 是支出分类，重置为收入默认「KFC兼职」
+    if(pickedCat.g==='elastic' || pickedCat.g==='fixed'){
+      pickedCat = {c:'KFC兼职', g:'income'};
+    }
+  }
+  highlightPicker();
+  toggleKfcHolidayRow();
+}
+
+/* 导入收入表（解析 xlsx 的「每日服务费汇总」「KFC」两表） */
+function excelSerialToTs(serial){
+  if(serial==null||serial===''||isNaN(serial)) return null;
+  const s=Number(serial);
+  if(!(s>20000)) return null;
+  return new Date((s-25569)*86400*1000).getTime();
+}
+function hasIncomeOn(ts,category){
+  const d=dateOnly(ts);
+  return S.tx.some(t=>t.direction==='in'&&t.category===category&&dateOnly(t.ts)===d);
+}
+async function importIncomeXlsx(){
+  const f=document.getElementById('xlsxFile').files[0];
+  if(!f) return;
+  const log=document.getElementById('importLog');
+  log.textContent='解析中…';
+  try{
+    const buf=await f.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    let added=0, skipped=0;
+    const findSheet=(pred)=>wb.SheetNames.find(pred);
+    const svcName=findSheet(n=>n.includes('服务费')||n.includes('每日'));
+    if(svcName){
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[svcName],{header:1,defval:null,blankrows:false});
+      let hdr=-1;
+      for(let i=0;i<rows.length;i++){ if(Array.isArray(rows[i])&&rows[i].some(c=>c==='日期')&&rows[i].some(c=>String(c).includes('服务费合计'))){ hdr=i; break; } }
+      if(hdr>=0){
+        for(let i=hdr+1;i<rows.length;i++){
+          const r=rows[i]; if(!r||r.length<3) continue;
+          const svc=r[2]; if(svc==null||svc===0||svc==='') continue;
+          const ts=excelSerialToTs(r[0]); if(!ts) continue;
+          if(hasIncomeOn(ts,'认证服务费')){ skipped++; continue; }
+          S.tx.push({id:uid(),ts,direction:'in',group:'income',category:'认证服务费',amount:Math.round(Number(svc)*100)/100,note:'服务费 '+(r[3]||'')+' 笔（来自收入表）'});
+          added++;
+        }
+      }
+    }
+    const kfcName=findSheet(n=>n.toUpperCase()==='KFC');
+    if(kfcName){
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[kfcName],{header:1,defval:null,blankrows:false});
+      let hdr=-1;
+      for(let i=0;i<rows.length;i++){ if(Array.isArray(rows[i])&&rows[i].some(c=>c==='日期')&&rows[i].some(c=>String(c).includes('合计'))){ hdr=i; break; } }
+      if(hdr>=0){
+        for(let i=hdr+1;i<rows.length;i++){
+          const r=rows[i]; if(!r||r.length<5) continue;
+          const total=r[4]; if(total==null||total===0||total==='') continue;
+          const ts=excelSerialToTs(r[0]); if(!ts) continue;
+          if(hasIncomeOn(ts,'KFC兼职')){ skipped++; continue; }
+          const rateTxt=(r[3]&&r[3]!==22)?(' @'+r[3]):'';
+          S.tx.push({id:uid(),ts,direction:'in',group:'income',category:'KFC兼职',amount:Math.round(Number(total)*100)/100,note:'KFC '+(r[2]||'')+' 时'+rateTxt+'（来自收入表）'});
+          added++;
+        }
+      }
+    }
+    await safePersist();
+    renderDashboard(); renderTxList();
+    log.textContent=`导入完成：新增 ${added} 笔收入，跳过重复 ${skipped} 笔。`;
+    toast(added>0?'已导入 '+added+' 笔收入':'没有新增（都已导入过）');
+  }catch(e){
+    log.textContent='导入失败：'+e.message;
+    toast('导入失败');
+  }
+}
+async function saveKfc(){
+  S.settings.kfcRateNormal=num('kfcNormal')||22;
+  S.settings.kfcRateHoliday=num('kfcHoliday')||48;
+  await safePersist();
+  toast('KFC 单价已保存');
+}
+function fillKfcInputs(){
+  document.getElementById('kfcNormal').value=S.settings.kfcRateNormal;
+  document.getElementById('kfcHoliday').value=S.settings.kfcRateHoliday;
+}
+
+/* 存款曲线 SVG */
+function depositChartSVG(tx, current){
+  const W=560,H=210,pad=34;
+  if(!tx.length) return '<div class="muted">还没有流水，记几笔就能看到曲线啦～</div>';
+  const sorted=[...tx].sort((a,b)=>a.ts-b.ts);
+  const net = sorted.reduce((a,t)=>a+(t.direction==='in'?t.amount:-t.amount),0);
+  const base = current - net;
+  const pts=[]; let acc=base;
+  sorted.forEach(t=>{ acc += (t.direction==='in'?t.amount:-t.amount); pts.push(acc); });
+  const vals=[base,...pts];
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const xstep=(W-pad*2)/Math.max(1,pts.length-1);
+  const y=(v)=>{ const r=(mx-mn)||1; return H-pad - (v-mn)/r*(H-pad*2); };
+  const line=pts.map((v,i)=>`${i===0?'M':'L'}${(pad+i*xstep).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area=line+` L${(pad+(pts.length-1)*xstep).toFixed(1)},${H-pad} L${pad},${H-pad} Z`;
+  const dots=pts.map((v,i)=>`<circle cx="${(pad+i*xstep).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.4" fill="#56B98C"/>`).join('');
+  const last=v=>{ const r=(mx-mn)||1; return H-pad - (v-mn)/r*(H-pad*2); };
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FE0C4" stop-opacity=".35"/><stop offset="1" stop-color="#9FE0C4" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="#EAE0CF"/>
+    <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H-pad}" stroke="#EAE0CF"/>
+    <path d="${area}" fill="url(#dg)"/>
+    <path d="${line}" fill="none" stroke="#56B98C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    ${dots}
+    <text x="${W-pad}" y="${last(current)-8}" text-anchor="end" font-size="11" font-weight="700" fill="#56B98C">${fmt0(current)}</text>
+    <text x="${pad}" y="${pad-12}" font-size="10.5" fill="#9A9085">本金起点 ${fmt0(base)}</text>
+  </svg>`;
+}
+
+function ringSVG(p, midMain, midSub){
+  const R=46,C=2*Math.PI*R, off=C*(1-Math.min(100,p)/100);
+  return `<div class="ring">
+    <svg viewBox="0 0 108 108">
+      <circle cx="54" cy="54" r="${R}" fill="none" stroke="#EAE0CF" stroke-width="11"/>
+      <circle cx="54" cy="54" r="${R}" fill="none" stroke="#56B98C" stroke-width="11" stroke-linecap="round"
+        stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 54 54)"/>
+    </svg>
+    <div class="mid"><div class="p">${p}%</div><div class="s">${midSub}</div></div>
+  </div>`;
+}
+
+/* =================== 流水行 =================== */
+/* 主分类（如命中 EXP_CAT）：catcol 为该类色；否则按 direction/group 兜底 */
+function catColorOf(cat, dir){
+  if(EXP_CAT[cat]) return EXP_CAT[cat].col;
+  if(dir==='in') return '#56B98C';
+  return '#7FC8A9';
+}
+/* 把主色变浅做 chip 背景（透明度 14%），深色做文字色；边框用主色 32% */
+function catChipStyle(cat, dir){
+  const col = catColorOf(cat, dir);
+  return `--catbg:${col}22;--catbd:${col}55;--catcol:${col};--catfg:${col};`;
+}
+function txRow(t){
+  const cls = t.direction==='in'?'in':(t.group==='fixed'?'fixed':'elastic');
+  const icon = t.direction==='in'?ICON.coin : (t.group==='fixed'?ICON.shield:ICON.pen);
+  const sign = t.direction==='in'?'+':'−';
+  const col = t.direction==='in'?'in':'out';
+  const chip = escapeHtml(t.category||'其他');
+  const style = catChipStyle(t.category, t.direction);
+  return `<div class="tx">
+    <span class="ic ${cls}">${icon}</span>
+    <span class="info">
+      <span class="c" style="${style}" title="${chip}">${chip}</span>
+      <span class="n">${escapeHtml(t.note||'')}${t.note?' · ':''}${dateOnly(t.ts).slice(5)}</span>
+    </span>
+    <span class="amt ${col}">${sign}${fmt(t.amount)}</span>
+    <span class="ops">
+      <button data-del="${t.id}" title="删除">${ICON.trash}</button>
+    </span>
+  </div>`;
+}
+
+function renderTxList(){
+  const sorted=[...S.tx].sort((a,b)=>b.ts-a.ts);
+  document.getElementById('txCount').textContent='共 '+sorted.length+' 笔';
+  const listEl=document.getElementById('txList');
+  if(!sorted.length){ listEl.innerHTML='<div class="muted">还没有记录～</div>'; return; }
+  // v23：月份一级折叠 + 月内按 category 二级折叠
+  const cur = monthKey(Date.now());
+  const byMonth = {};
+  sorted.forEach(t=>{
+    const k = monthKey(t.ts) || '未知';
+    (byMonth[k]=byMonth[k]||[]).push(t);
+  });
+  const monthKeys = Object.keys(byMonth).sort((a,b)=> b.localeCompare(a));
+  listEl.innerHTML = monthKeys.map(mk=>{
+    const items = byMonth[mk];
+    const income  = items.filter(t=>t.direction==='in').reduce((s,t)=>s+t.amount,0);
+    const expense = items.filter(t=>t.direction!=='in').reduce((s,t)=>s+t.amount,0);
+    const sumTxt  = income>0 && expense>0 ? `收${fmt(income)} / 支${fmt(expense)}`
+                  : income>0 ? `+${fmt(income)}`
+                  : `−${fmt(expense)}`;
+    const sumCol  = income>expense ? 'in' : (expense>income?'out':'');
+    const isCur   = (mk === cur);
+    const monthLab = (mk===cur) ? `${mk}（本月）` : mk;
+
+    // 月内按 category 二级聚合
+    const byCat = {};
+    items.forEach(t=>{
+      const c = t.category || '其他';
+      (byCat[c]=byCat[c]||[]).push(t);
+    });
+    /* 排序：收入类在前（按金额 desc），支出类在后（按金额 desc） */
+    const catKeys = Object.keys(byCat).sort((a,b)=>{
+      const ad = byCat[a][0].direction==='in'?0:1;
+      const bd = byCat[b][0].direction==='in'?0:1;
+      if(ad!==bd) return ad-bd;
+      const sa = byCat[a].reduce((s,t)=>s+t.amount,0);
+      const sb = byCat[b].reduce((s,t)=>s+t.amount,0);
+      return sb-sa;
+    });
+    const inner = catKeys.map(ck=>{
+      const its = byCat[ck];
+      const dir = its[0].direction==='in' ? 'in' : 'out';
+      const sum = its.reduce((s,t)=>s+t.amount,0);
+      const sign = dir==='in' ? '+' : '−';
+      const catCol = catColorOf(ck, dir);
+      const catBg  = `${catCol}22`;   /* 14% alpha */
+      const catBd  = `${catCol}55`;
+      // 当月内 "只有 1 笔" 的 cat 默认展开；其它默认折叠（保留月份 open 即可看到分类，再展开看条目）
+      const onlyOne = its.length === 1;
+      return `<details class="catsub" data-cat="${escapeHtml(ck)}" data-dir="${dir}" ${onlyOne?'open':''} style="--catcol:${catCol}">
+        <summary>
+          <svg class="chev" viewBox="0 0 16 16" width="14" height="14"><path d="M5 3l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="catdot"></span>
+          <span class="catname" style="background:${catBg};border-color:${catBd};color:${catCol}">${escapeHtml(ck)}</span>
+          <span class="catmeta">${its.length} 笔</span>
+          <span class="catamt ${dir==='in'?'in':'out'}">${sign}${fmt(sum)}</span>
+        </summary>
+        <div class="crow">${its.map(txRow).join('')}</div>
+      </details>`;
+    }).join('');
+
+    return `<details class="txgroup month-group" ${isCur?'open':''}>
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" width="14" height="14"><path d="M5 3l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="gname">${escapeHtml(monthLab)}</span>
+        <span class="gmeta">${items.length} 笔</span>
+        <span class="gamt ${sumCol}">${sumTxt}</span>
+      </summary>
+      <div class="grow">${inner}</div>
+    </details>`;
+  }).join('');
+  document.querySelectorAll('#txList [data-del]').forEach(b=>b.onclick=()=>confirmDelete(b.dataset.del));
+  const ta=document.getElementById('toggleAll');
+  if(ta){
+    const anyClosed = [...listEl.querySelectorAll('details.txgroup')].some(d=>!d.open);
+    ta.textContent = anyClosed ? '展开全部' : '收起全部';
+    ta.onclick=()=>{
+      const months = listEl.querySelectorAll('details.txgroup');
+      const closed = [...months].some(d=>!d.open);
+      months.forEach(d=>{ d.open = closed; });
+      ta.textContent = closed ? '收起全部' : '展开全部';
+    };
+  }
+}
+
+/* =================== 记账 =================== */
+/* 已选分类：{c,g}。支出 g∈{fixed,elastic}；收入 g='income'。
+   default=支出/餐饮(elastic)，由 syncPickerArea 根据当前 dirSeg 决定初始值。 */
+let pickedCat = {c:'餐饮', g:'elastic'};
+let curDir='out';
+function toggleKfcHolidayRow(){
+  const row=document.getElementById('kfcHolidayRow'); if(!row) return;
+  const show = curDir==='in' && pickedCat.c==='KFC兼职';
+  row.style.display = show?'flex':'none';
+  if(!show){ const c=document.getElementById('kfcHolidayChk'); if(c) c.checked=false; }
+}
+function updateConvert(){
+  const amt=parseFloat(document.getElementById('amtInp').value);
+  const box=document.getElementById('convertBox');
+  if(!(amt>0)){ box.style.display='none'; return; }
+  const cat=pickedCat.c;
+  const hMain=calcHourly(S.settings).hourly;
+  const isKfc = cat==='KFC兼职';
+  const isSvc = cat==='认证服务费';
+  const kfcHoliday = isKfc && document.getElementById('kfcHolidayChk') && document.getElementById('kfcHolidayChk').checked;
+  const rate = isKfc ? (kfcHoliday ? (Number(S.settings.kfcRateHoliday)||48) : (Number(S.settings.kfcRateNormal)||22)) : hMain;
+  const hrs = rate>0? amt/rate : 0;
+  const hh=Math.floor(hrs), mm=Math.round((hrs-hh)*60);
+  const time = hh>0? `${hh} 小时 ${mm} 分` : `${mm} 分`;
+  box.style.display='flex';
+  if(curDir==='in'){
+    if(isKfc){
+      document.getElementById('convertBig').textContent='≈ KFC '+time;
+      document.getElementById('convertSub').textContent=`按 ¥${rate}/时（${kfcHoliday?'法定休假日':'平时'}），这笔 KFC 收入 ≈ KFC 干 ${time}`;
+    }else if(isSvc){
+      const certH=Math.round(amt/2*100)/100;
+      document.getElementById('convertBig').textContent='≈ 认证工作 2 小时';
+      document.getElementById('convertSub').textContent=`这笔服务费 = 你那天做认证（预约登记1h+送件1h）约 2 小时换来的；当日认证时薪 ≈ ¥${certH}/时`;
+    }else{
+      document.getElementById('convertBig').textContent='≈ 主业 '+time;
+      document.getElementById('convertSub').textContent='这笔收入 ≈ 主业干 '+time+' 的价值';
+    }
+  }else{
+    document.getElementById('convertBig').textContent='≈ 工作 '+time;
+    document.getElementById('convertSub').textContent='这笔花掉的钱，需要你埋头干 '+time;
+  }
+}
+async function saveTx(){
+  const amt=parseFloat(document.getElementById('amtInp').value);
+  if(!(amt>0)){ toast('先填一个大于 0 的金额'); return; }
+  let category, group;
+  if(curDir==='in'){ category=pickedCat.c; group='income'; }
+  else { category=pickedCat.c; group=pickedCat.g; }
+  let note=document.getElementById('noteInp').value.trim();
+  if(curDir==='in' && category==='KFC兼职' && document.getElementById('kfcHolidayChk') && document.getElementById('kfcHolidayChk').checked){
+    note=(note? note+' · ':'')+'法定休假日¥48/时';
+  }
+  const dval=document.getElementById('dateInp').value;
+  const ts = dval ? new Date(dval+'T12:00:00').getTime() : Date.now();
+  const t={ id:uid(), ts, direction:curDir, group, category, amount:Math.round(amt*100)/100, note };
+  S.tx.push(t);
+  const mode=await safePersist();
+  toast(mode==='online'?'已保存到云端':'已记下一笔');
+  document.getElementById('amtInp').value='';
+  document.getElementById('noteInp').value='';
+  document.getElementById('convertBox').style.display='none';
+  renderDashboard(); renderTxList();
+}
+function confirmDelete(id){
+  openModal('删除这笔记录？','删除后无法恢复，确定要删除吗？',async ()=>{
+    S.tx=S.tx.filter(t=>t.id!==id);
+    await safePersist();
+    renderDashboard(); renderTxList(); toast('已删除');
+  });
+}
+
+/* =================== 真实时薪 =================== */
+function fillHourlyInputs(){
+  const s=S.settings;
+  document.getElementById('s_net').value=s.netMonthly;
+  document.getElementById('s_pay').value=s.payMonths;
+  document.getElementById('s_cost').value=s.workCostMonthly;
+  document.getElementById('s_present').value=s.presentHoursDay;
+  document.getElementById('s_commute').value=s.commuteHoursDay;
+  document.getElementById('s_days').value=s.workDaysMonth;
+  document.getElementById('s_ot').value=s.overtimeHoursMonth;
+  document.getElementById('s_save').value=s.currentSavings;
+  renderFormula();
+}
+function readHourlyInputs(){
+  return {
+    netMonthly:num('s_net'), payMonths:num('s_pay'), workCostMonthly:num('s_cost'),
+    presentHoursDay:num('s_present'), commuteHoursDay:num('s_commute'),
+    workDaysMonth:num('s_days'), overtimeHoursMonth:num('s_ot'), currentSavings:num('s_save'),
+    freedomGoal:S.settings.freedomGoal, safetyGoal:S.settings.safetyGoal, withdrawRate:S.settings.withdrawRate
+  };
+}
+function num(id){ return parseFloat(document.getElementById(id).value)||0; }
+function renderFormula(){
+  const s=readHourlyInputs();
+  const h=calcHourly(s);
+  const box=document.getElementById('formulaBox');
+  if(box) box.innerHTML=`
+    <div class="row"><span class="k">年实际到手 = 到手月薪 × 发薪月数</span><span class="v">${fmt0(h.annualTake)}</span></div>
+    <div class="row"><span class="k">年工作成本 = 工作成本/月 × 12</span><span class="v">${fmt0(h.annualCost)}</span></div>
+    <div class="row"><span class="k">年净到手 = 年实际到手 − 年工作成本</span><span class="v">${fmt0(h.annualNet)}</span></div>
+    <div class="row"><span class="k">每天耗时 = 在场时间 + 通勤</span><span class="v">${h.dailyHours.toFixed(1)} 小时</span></div>
+    <div class="row"><span class="k">年总耗时 = 每天耗时 × 月工作天数 × 12 + 加班/月 × 12</span><span class="v">${fmt0(h.annualHours)} 小时</span></div>
+    <div class="final">${fmt0(h.hourly)} / 小时<small>真实时薪 = 年净到手 ÷ 年总耗时</small></div>`;
+  document.getElementById('hourlyHeadline').textContent=fmt0(h.hourly)+' / 小时';
+}
+async function saveHourlyToSettings(){
+  // 把时薪相关参数同步回设置，供记账换算 & 首页使用
+  const s=readHourlyInputs();
+  S.settings.netMonthly=s.netMonthly; S.settings.payMonths=s.payMonths;
+  S.settings.workCostMonthly=s.workCostMonthly; S.settings.presentHoursDay=s.presentHoursDay;
+  S.settings.commuteHoursDay=s.commuteHoursDay; S.settings.workDaysMonth=s.workDaysMonth;
+  S.settings.overtimeHoursMonth=s.overtimeHoursMonth; S.settings.currentSavings=s.currentSavings;
+  const mode=await safePersist();
+  renderDashboard();
+  renderFundRings();
+  toast(mode==='online'?'参数已存到云端':'时薪参数已保存');
+}
+
+/* =================== 反推条（合并自情景模拟） =================== */
+// 把当前 settings 同步到反推条滑块位置（避免改上方输入后滑块和数值脱节）
+function syncSimSliders(){
+  const sc=document.getElementById('simCommute');
+  const so=document.getElementById('simOt');
+  if(sc) sc.value=S.settings.commuteHoursDay||0;
+  if(so) so.value=S.settings.overtimeHoursMonth||0;
+  runSim();
+}
+function runSim(){
+  const base=calcHourly(S.settings).hourly;
+  const c=parseFloat(document.getElementById('simCommute').value);
+  const o=parseFloat(document.getElementById('simOt').value);
+  const r=parseFloat(document.getElementById('simRaise').value);
+  document.getElementById('simCommuteVal').textContent=c.toFixed(1);
+  document.getElementById('simOtVal').textContent=o;
+  document.getElementById('simRaiseVal').textContent=r;
+  // 滑块 → 同步回上方输入框（不写 settings；用户主动滑块期间预览态）
+  document.getElementById('s_commute').value=c;
+  document.getElementById('s_ot').value=o;
+  const hc=calcHourly({...S.settings, commuteHoursDay:c}).hourly;
+  const ho=calcHourly({...S.settings, overtimeHoursMonth:o}).hourly;
+  const hr=calcHourly({...S.settings, netMonthly:S.settings.netMonthly*(1+r/100)}).hourly;
+  const best=Math.max(hc,ho,hr);
+  let tip;
+  if(best===hr) tip='涨薪对时薪的提升最明显——谈薪永远是最划算的事。';
+  else if(best===hc) tip='缩短通勤直接"赚"回时间，还没成本，优先考虑。';
+  else tip='减少无意义加班，把时间留给复利，比耗时长更有价值。';
+  const simRows = [
+    {label:'通勤 '+c.toFixed(1)+'h', v:hc},
+    {label:'加班 '+o+'h/月', v:ho},
+    {label:r===0?'不涨薪':('涨薪 +'+r+'%（月薪≈'+fmt0(S.settings.netMonthly*(1+r/100))+')'), v:hr}
+  ];
+  const cells = simRows.map(row=>{
+    const d=row.v-base;
+    const cls=d>=0?'delta-up':'delta-dn';
+    const sign=d>=0?'+':'';
+    return `<div class="sim-cell"><div class="lab">${row.label}</div><div class="val ${cls}">${fmt0(row.v)}/时<small>${sign}${d.toFixed(1)}</small></div></div>`;
+  }).join('');
+  document.getElementById('simCompare').innerHTML=`<div class="sim-compact"><div class="sim-compact-head">基准时薪 <b>${fmt0(base)}/时</b></div><div class="sim-compact-cells">${cells}</div><div class="sim-compact-tip muted">${tip}</div></div>`;
+}
+
+/* =================== 设置 =================== */
+function fillGoalInputs(){
+  document.getElementById('g_freedom').value=S.settings.freedomGoal;
+  document.getElementById('g_safety').value=S.settings.safetyGoal;
+  document.getElementById('g_rate').value=S.settings.withdrawRate;
+  document.getElementById('g_save').value=S.settings.currentSavings;
+}
+async function saveGoals(){
+  S.settings.freedomGoal=parseFloat(document.getElementById('g_freedom').value)||0;
+  S.settings.safetyGoal=parseFloat(document.getElementById('g_safety').value)||0;
+  S.settings.withdrawRate=parseFloat(document.getElementById('g_rate').value)||0;
+  S.settings.currentSavings=parseFloat(document.getElementById('g_save').value)||0;
+  const mode=await safePersist();
+  renderDashboard();
+  renderFundRings();
+  toast(mode==='online'?'目标已存到云端':'目标已保存');
+}
+
+/* =================== 数据导入导出 =================== */
+function exportJSON(){
+  const data={ settings:S.settings, tx:S.tx, exportedAt:Date.now() };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='打工人小账本_备份_'+dateOnly(Date.now())+'.json'; a.click();
+  toast('已导出 JSON 备份');
+}
+function importJSON(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(!d.settings||!Array.isArray(d.tx)) throw new Error('格式不对');
+      S.settings=Object.assign(clone(DEFAULT_SETTINGS),d.settings);
+      S.tx=d.tx;
+      safePersist().then(()=>{ renderAll(); toast('已从备份恢复 '+d.tx.length+' 笔'); });
+    }catch(e){ toast('导入失败：'+e.message); }
+  };
+  rd.readAsText(file);
+}
+function clearAll(){
+  openModal('清空全部数据？','将删除所有流水与设置并恢复示例值，此操作不可恢复。',async ()=>{
+    localStorage.removeItem(KEY_TX); localStorage.removeItem(KEY_SET);
+    S.settings=clone(DEFAULT_SETTINGS); S.tx=[];
+    const seed=seedData(); S.settings=seed.settings; S.tx=seed.tx;
+    localStorage.setItem(KEY_SET,JSON.stringify(S.settings));
+    localStorage.setItem(KEY_TX,JSON.stringify(S.tx));
+    renderAll(); toast('已重置为示例数据');
+  });
+}
+
+/* =================== modal =================== */
+let modalCb=null;
+function openModal(title,text,cb){
+  document.getElementById('mTitle').textContent=title;
+  document.getElementById('mText').textContent=text;
+  document.getElementById('mask').classList.add('show');
+  modalCb=cb;
+}
+function closeModal(){ document.getElementById('mask').classList.remove('show'); modalCb=null; }
+
+/* =================== 持久化（带失败提示） =================== */
+async function safePersist(){
+  try{
+    const mode=await Store.persist();
+    const text = (gist.enabled) ? '已保存并同步' : '已保存到本地';
+    setSync('ok', text);
+    return mode;
+  }catch(e){
+    try{ localStorage.setItem(KEY_SET, JSON.stringify(S.settings)); localStorage.setItem(KEY_TX, JSON.stringify(S.tx)); }catch(_){}
+    setSync('err','同步失败'); toast('同步失败：'+e.message);
+    return 'fallback';
+  }
+}
+
+/* =================== 启动 =================== */
+async function boot(){
+  setSync('busy','加载中…');
+  document.getElementById('errZone').innerHTML='';
+  try{
+    const d=await Store.loadAll();
+    S.settings=d.settings; S.tx=d.tx; S.error=null; S.ready=true;
+    syncUi=null;
+  }catch(e){
+    // 读取失败：用默认设置兜底渲染界面，绝不白屏；顶部给出明确错误+重试
+    S.error=e.message;
+    S.settings=clone(DEFAULT_SETTINGS); S.tx=[];
+    setSync('err','读取失败：'+e.message);
+    document.getElementById('errZone').innerHTML=`<div class="err-banner">
+      <span>${ICON.warn}</span>
+      <div style="flex:1">数据读取失败：${escapeHtml(e.message)}<br>已用默认设置渲染界面，点重试可重新加载。</div>
+      <button class="btn" style="width:auto;padding:10px 18px" onclick="boot()">重试</button>
+    </div>`;
+  }
+  // 无论成功失败，先把界面画出来（不白屏）
+  renderAll();
+  gistInit();
+}
+function renderAll(){
+  paintIcons();
+  renderSync();
+  maybeShowInstallBar();
+  document.getElementById('todayDate').textContent=dateOnly(Date.now())+' · 周日'.replace('周日',weekday());
+  if(S.ready || S.error){
+    renderDashboard(); renderTxList();
+    if(document.getElementById('view-hourly').classList.contains('active')){ fillHourlyInputs(); syncSimSliders(); }
+    if(document.getElementById('view-settings').classList.contains('active')) fillGoalInputs();
+    if(document.getElementById('view-simulate').classList.contains('active')) runSim();
+  }
+}
+function weekday(){ const w=['周日','周一','周二','周三','周四','周五','周六']; return w[new Date().getDay()]; }
+
+/* =================== 事件绑定 =================== */
+function bind(){
+  document.querySelectorAll('.nav-item,.bt').forEach(n=>n.onclick=()=>switchView(n.dataset.view));
+  document.getElementById('syncRetry').onclick=()=>boot();
+  // 记账
+  document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#dirSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); curDir=b.dataset.dir; syncPickerArea(); updateConvert();
+  });
+  document.getElementById('amtInp').oninput=updateConvert;
+  document.getElementById('dateInp').value=dateOnly(Date.now());
+  document.getElementById('saveBtn').onclick=saveTx;
+  // 时薪
+  ['s_net','s_pay','s_cost','s_present','s_commute','s_days','s_ot','s_save'].forEach(id=>{
+    document.getElementById(id).oninput=()=>{ renderFormula(); syncSimSliders(); };
+  });
+  document.getElementById('hourlyReset').onclick=()=>{ S.settings=clone(DEFAULT_SETTINGS); safePersist().then(()=>{fillHourlyInputs();renderDashboard();toast('已恢复示例值');}); };
+  document.getElementById('s_save').addEventListener('change',saveHourlyToSettings);
+  ['s_net','s_pay','s_cost','s_present','s_commute','s_days','s_ot'].forEach(id=>document.getElementById(id).addEventListener('change',saveHourlyToSettings));
+  // 模拟
+  ['simCommute','simOt','simRaise'].forEach(id=>document.getElementById(id).oninput=runSim);
+  // 设置
+  document.getElementById('saveGoals').onclick=saveGoals;
+  document.getElementById('exportBtn').onclick=exportJSON;
+  document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+  document.getElementById('importFile').onchange=(e)=>{ if(e.target.files[0]) importJSON(e.target.files[0]); };
+  document.getElementById('clearBtn').onclick=clearAll;
+  // 收入组合来源：KFC 单价 + 导入收入表
+  document.getElementById('saveKfc').onclick=saveKfc;
+  document.getElementById('importXlsxBtn').onclick=()=>document.getElementById('xlsxFile').click();
+  document.getElementById('xlsxFile').onchange=(e)=>{ if(e.target.files[0]) importIncomeXlsx(); };
+  // modal
+  document.getElementById('mCancel').onclick=closeModal;
+  document.getElementById('mOk').onclick=()=>{ const cb=modalCb; closeModal(); if(cb) cb(); };
+  document.getElementById('mask').onclick=(e)=>{ if(e.target.id==='mask') closeModal(); };
+}
+
+/* =================== 同步状态/卡片 · 安装 APP · Service Worker =================== */
+function renderSync(){
+  const box=document.getElementById('syncBox');
+  const txt=document.getElementById('syncText');
+  if(!box||!txt) return;
+  if(syncUi){
+    box.className='sync '+syncUi.state;
+    txt.textContent=syncUi.text;
+    const ret=document.getElementById('syncRetry'); if(ret) ret.style.display=(syncUi.state==='err')?'inline-block':'none';
+    return;
+  }
+  if(gist.enabled && gist.gistId){ box.className='sync ok'; txt.textContent='已连接 Gist'; }
+  else if(gist.enabled){ box.className='sync ok'; txt.textContent='同步已启用'; }
+  else { box.className='sync local'; txt.textContent='仅本地保存（设置里可开云端）'; }
+  const ret=document.getElementById('syncRetry'); if(ret) ret.style.display='none';
+}
+function renderSyncCard(){
+  const el=document.getElementById('syncCard'); if(!el) return;
+  if(gist.enabled && gist.gistId){
+    el.innerHTML = `
+      <p class="muted" style="margin:-4px 0 12px">手机和网页共享同一份数据，存在你的私有 Gist 里。</p>
+      <div class="conn-pill"><span class="dot"></span><span class="t">已连接</span></div>
+      <p class="conn-sub">同步文件 · <code>${GIST_FILE}</code></p>
+      <div id="syncGistInfo" style="margin:6px 0 10px;font-size:13px;color:var(--sub)"></div>
+      <div id="syncStatus" class="sync-status"></div>
+      <div class="btn-row"><button class="btn ghost" id="gistPull">↓ 从云端拉取</button><button class="btn ghost" id="gistPush">↑ 上传到云端</button></div>
+      <div class="btn-row" style="margin-top:8px"><button class="btn warn" id="gistDisconnect">断开连接</button><button class="btn mint" id="gistCheck">检查 / 排错</button></div>`;
+    showGistInfo();
+    const pull=document.getElementById('gistPull'); if(pull) pull.onclick=async()=>{ try{ setSync('busy','同步中…'); await pullGist(); renderAll(); setSync('ok','已连接'); toast('已拉取 '+S.tx.length+' 笔'); }catch(e){ setSync('err','同步失败'); toast('拉取失败：'+e.message); } };
+    const push=document.getElementById('gistPush'); if(push) push.onclick=async()=>{ try{ setSync('busy','推送中…'); await pushGist(); renderAll(); setSync('ok','已连接'); toast('已推送 '+S.tx.length+' 笔'); }catch(e){ setSync('err','推送失败'); toast('推送失败：'+e.message); } };
+    const disc=document.getElementById('gistDisconnect'); if(disc) disc.onclick=gistDisable;
+    const chk=document.getElementById('gistCheck'); if(chk) chk.onclick=async()=>{ setSync('busy','检查中…'); try{ const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'Bearer '+gist.token}}); if(r.ok){ setSync('ok','已连接'); syncStatus('✓ Token 有效','ok'); toast('✓ Token 有效'); } else { setSync('err','异常'); toast('返回 '+r.status); } }catch(e){ setSync('err','异常'); toast('检查失败：'+e.message); } };
+  } else {
+    el.innerHTML = `
+      <p class="muted" style="margin:-4px 0 12px">当前仅本设备保存。开启 <b>GitHub Gist 同步</b> 后，手机和网页共享同一份数据 — 存在你 <b>自己的私有 Gist</b>，完全私有。</p>
+      <label class="fld"><span class="t">GitHub Personal Access Token（需 gist 权限）</span><input type="password" id="syncToken" placeholder="ghp_xxx 或 github_pat_xxx" autocomplete="off"></label>
+      <label class="fld"><span class="t">Gist ID（可选，留空自动创建）</span><input type="text" id="syncGistId" placeholder="留空=首次自动新建私有 Gist"></label>
+      <div id="syncStatus" class="sync-status"></div>
+      <div class="btn-row"><button class="btn" id="gistConnect">启用并同步</button></div>
+      <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">如何创建 Token（gist 权限）？</summary>
+        <ol class="muted" style="padding-left:18px;margin:8px 0 0">
+          <li>GitHub → Settings → Developer settings → Personal access tokens → <b>Tokens (classic)</b></li>
+          <li>点 <b>Generate new token (classic)</b>，Note 随便填，Expiration 选 30/90 天</li>
+          <li>Scope 只勾 <b><code>gist</code></b>（创建/读写你的 Gist）一项即可</li>
+          <li>生成后那串 <code>ghp_xxx</code> 立刻复制保存（只显示一次）。Token 只存本设备浏览器，换设备要重新粘。</li>
+        </ol></details>`;
+    const conn=document.getElementById('gistConnect'); if(conn) conn.onclick=gistEnable;
+  }
+}
+
+/* 安装 APP */
+let deferredInstallPrompt=null;
+function isIos(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function isInStandalone(){ if(window.navigator.standalone===true) return true; try{ return !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }catch(e){ return false; } }
+function maybeShowInstallBar(){
+  if(sessionStorage.getItem('install_dismissed')==='1') return;
+  const bar=document.getElementById('installBar');
+  if(!bar) return;
+  if(isInStandalone()){ bar.style.display='none'; return; }
+  if(deferredInstallPrompt){
+    bar.style.display='flex';
+    bar.querySelector('#installText').textContent='把「打工人小账本」装到主屏幕，像 APP 一样打开';
+    bar.querySelector('#installBtn').style.display='inline-flex';
+    bar.querySelector('#installIos').style.display='none';
+  } else if(isIos()){
+    bar.style.display='flex';
+    bar.querySelector('#installText').textContent='iPhone：底部 ⤴ 分享 → 选「添加到主屏幕」';
+    bar.querySelector('#installBtn').style.display='none';
+    bar.querySelector('#installIos').style.display='inline-flex';
+  } else {
+    bar.style.display='none';
+  }
+}
+window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredInstallPrompt=e; maybeShowInstallBar(); });
+window.addEventListener('appinstalled',()=>{ deferredInstallPrompt=null; const b=document.getElementById('installBar'); if(b) b.style.display='none'; toast('已安装到主屏幕'); });
+
+const ib=document.getElementById('installBtn');
+if(ib) ib.onclick=async()=>{
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const c=await deferredInstallPrompt.userChoice;
+  if(c && c.outcome==='accepted'){ const b=document.getElementById('installBar'); if(b) b.style.display='none'; }
+  deferredInstallPrompt=null;
+};
+const ii=document.getElementById('installIos');
+if(ii) ii.onclick=()=>{ toast('Safari：底部 ⤴ → 添加到主屏幕'); };
+const ic=document.getElementById('installClose');
+if(ic) ic.onclick=()=>{ const b=document.getElementById('installBar'); if(b) b.style.display='none'; sessionStorage.setItem('install_dismissed','1'); };
+
+/* Service Worker（离线缓存 + 新版本自动刷新，避免一直看旧缓存） */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      let reloaded=false;
+      const onNew=()=>{ if(!reloaded){ reloaded=true; location.reload(); } };
+      if(reg.waiting && navigator.serviceWorker.controller) onNew();
+      reg.addEventListener('updatefound',()=>{
+        const nw=reg.installing;
+        if(nw) nw.addEventListener('statechange',()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) onNew(); });
+      });
+      navigator.serviceWorker.addEventListener('controllerchange',onNew);
+    }).catch(()=>{});
+  });
+}
+
+paintIcons();
+bind();
+boot();
+</script>
+</body>
+</html>
