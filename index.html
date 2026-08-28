@@ -241,6 +241,12 @@
   .sync-status.ok{background:#EAF7F0; color:#2E7459;}
   .sync-status.warn{background:#FFF6E0; color:#9C7320;}
   .sync-status.err{background:#FBE3DA; color:#A04236;}
+  /* 未开启云端同步的防呆横幅 */
+  .cloud-warn{display:flex; gap:10px; align-items:flex-start; background:#FFF1E6; border:1px solid #F4C89A;
+    color:#9A5B1E; border-radius:12px; padding:11px 13px; margin-bottom:10px; font-size:12.5px; line-height:1.5;}
+  .cloud-warn svg{flex:0 0 22px; width:22px; height:22px; margin-top:1px; color:#E0883A;}
+  .cloud-warn .cw-txt b{color:#8A4E18;}
+  @media(max-width:768px){ .cloud-warn{font-size:12px; padding:9px 11px;} }
 
   /* ============ 仪表盘新模块：月度结算条 / 排行榜 / 快记支出网格 ============ */
   /* 月度结算条 — v29 4 列等宽（收入/支出/结余/年结余），收入+支出可点击跳明细 */
@@ -653,6 +659,10 @@
 
     <!-- 仪表盘 -->
     <section class="view active" id="view-dashboard">
+      <div id="cloudWarn" class="cloud-warn" style="display:none">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div class="cw-txt"><b>数据未开启云端同步</b><br>当前仅保存在本设备浏览器，换手机 / 清缓存会丢失。打开右下「设置 → 云端同步」填入 GitHub Token 即可自动备份每一笔。</div>
+      </div>
       <div class="card tilt">
         <div class="tape"></div>
         <h2><span id="icBell"></span> 今天要处理</h2>
@@ -1004,6 +1014,7 @@ function gistDisable(){
 }
 function gistInit(){
   renderSyncCard();
+  renderCloudWarn();
   if(gist.enabled && gist.token){
     startAutoPull();
     pullGist(true);
@@ -1988,15 +1999,25 @@ async function boot(){
   // 无论成功失败，先把界面画出来（不白屏）
   renderAll();
   gistInit();
+  // 关闭 / 切后台时强制 flush 待推送数据，避免 800ms 防抖窗口内关页导致丢失
+  var _flush=function(){ if(gist.enabled && gist.token){ clearTimeout(gist._t); pushGist(); } };
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') _flush(); });
+  window.addEventListener('pagehide', _flush);
   // v28：刷新后停留在上次打开的页面（默认仪表盘）
   try{
     const last = localStorage.getItem(SET_LAST_VIEW);
     if(last && TITLES[last] && last!=='dashboard') switchView(last);
   }catch(_){}
 }
+function renderCloudWarn(){
+  var el=document.getElementById('cloudWarn'); if(!el) return;
+  var off = !(gist.enabled && gist.token);
+  el.style.display = off ? 'flex' : 'none';
+}
 function renderAll(){
   paintIcons();
   renderSync();
+  renderCloudWarn();
   maybeShowInstallBar();
   document.getElementById('todayDate').textContent=dateOnly(Date.now())+' · 周日'.replace('周日',weekday());
   if(S.ready || S.error){
