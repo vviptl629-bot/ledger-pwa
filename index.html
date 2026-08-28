@@ -937,7 +937,18 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v37';
+const APP_VERSION='v38';
+
+/* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
+   为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
+   A 端删掉一笔后，B 端那笔还在，同步时 B 会把它"还给"A，表现为「删了又复活」。
+   有了墓碑，删除动作才能像新增一样被同步到对端。 */
+const KEY_TOMB='wb_ledger_tomb_v1';
+var TOMB={};
+function loadTomb(){ try{ TOMB=JSON.parse(localStorage.getItem(KEY_TOMB)||'{}')||{}; }catch(e){ TOMB={}; } }
+function saveTomb(){ try{ localStorage.setItem(KEY_TOMB, JSON.stringify(TOMB)); }catch(e){} }
+/* 按墓碑过滤掉已删除的流水（拉取云端数据后 / 合并墓碑后调用） */
+function applyTomb(){ S.tx=(S.tx||[]).filter(function(t){ return !t || !TOMB[t.id]; }); }
 const ONLINE_ENDPOINT='';
 const DEFAULT_TOKEN_DAYS = 90;            // 默认 90 天
 const TOKEN_WARN_DAYS = 7;               // 到期前 N 天开始提醒
@@ -948,7 +959,9 @@ var gist={enabled:false,token:'',gistId:'',_t:null,_retry:null,_lastOk:0};
 try{ var _g=JSON.parse(localStorage.getItem(KEY_SYNC)||'{}'); gist.enabled=!!_g.enabled; gist.token=_g.token||''; gist.gistId=_g.gistId||''; }catch(e){}
 function saveSyncCfg(){ localStorage.setItem(KEY_SYNC, JSON.stringify({enabled:gist.enabled,token:gist.token,gistId:gist.gistId})); }
 function syncStatus(msg,cls){ var el=document.getElementById('syncStatus'); if(!el)return; el.textContent=msg||''; el.className='sync-status'+(cls?' '+cls:''); }
-function gistPayload(){ return JSON.stringify({ v:1, updatedAt:Date.now(), settings:S.settings, tx:S.tx }); }
+/* v38：推送前过滤示例数据——这是"异常数据上云"的最后一道理闸门。
+   即便本地因历史原因残留了 seed，也绝不会写进云端 Gist。 */
+function gistPayload(){ return JSON.stringify({ v:1, updatedAt:Date.now(), settings:S.settings, tx:stripSeed(S.tx), tombstones:TOMB }); }
 function makeFiles(body){ var o={}; o[GIST_FILE]={content:body}; return o; }
 async function gistReq(method,id,body){
   var url=id?('https://api.github.com/gists/'+id):'https://api.github.com/gists';
@@ -1000,7 +1013,15 @@ async function pullGist(silent){
     var d=JSON.parse(f.content);
     var before=JSON.stringify({s:S.settings,t:S.tx});
     if(d.settings) S.settings=Object.assign(clone(DEFAULT_SETTINGS), d.settings);
+    /* v38：先并入云端墓碑，再按合并后的墓碑过滤——否则对端已删除的流水会在这里"复活" */
+    if(d.tombstones && typeof d.tombstones==='object'){
+      var tn=0;
+      for(var k in d.tombstones){ if(!TOMB[k]){ TOMB[k]=d.tombstones[k]; tn++; } }
+      if(tn) saveTomb();
+    }
     if(Array.isArray(d.tx)) S.tx=mergeById(S.tx,d.tx);
+    S.tx=stripSeed(S.tx);   /* 云端本不该有示例数据，这里做防御性过滤 */
+    applyTomb();            /* 用合并后的墓碑剔除已删除项 */
     var after=JSON.stringify({s:S.settings,t:S.tx});
     if(before!==after){
       try{ localStorage.setItem(KEY_SET,JSON.stringify(S.settings)); localStorage.setItem(KEY_TX,JSON.stringify(S.tx)); }catch(_){}
@@ -1049,6 +1070,12 @@ function gistEnable(){
   var gid=document.getElementById('syncGistId').value.trim();
   if(!tok){ toast('请输入 Token'); return; }
   gist.token=tok; gist.gistId=gid; gist.enabled=true; saveSyncCfg();
+  /* v38：启用同步的这一刻就清掉示例数据，避免它作为"本地已有数据"被推上云端 */
+  var n0=S.tx.length;
+  S.tx=stripSeed(S.tx);
+  if(S.tx.length!==n0){
+    try{ localStorage.setItem(KEY_TX, JSON.stringify(S.tx)); }catch(_){}
+  }
   pushGist().then(function(){ gistInit(); toast('已启用并同步 ✅'); }).catch(function(e){ toast(e.message); });
 }
 function gistDisable(){
@@ -1079,14 +1106,34 @@ const Store={
   }
 };
 
+/* v38：示例数据（首次打开空账本时演示用）。
+   ⚠️ 这类数据**绝不是用户输入**，一旦混入同步会污染所有设备，因此：
+   1) 每笔都打 _seed:true 标记，便于精确识别；
+   2) 推送到云端前一律过滤（见 gistPayload）；
+   3) 启用云端同步时立即从本地清除（见 gistEnable / boot）。 */
+const SEED_SIG=[
+  ['工资',8000,'八月工资到手'],
+  ['房租/房贷',2500,'八月房租'],
+  ['餐饮',32,'午饭+咖啡'],
+  ['购物',199,'日用品补货']
+];
+function isSeedTx(t){
+  if(!t) return false;
+  if(t._seed === true) return true;                       // 新版：显式标记
+  return SEED_SIG.some(function(s){                        // 旧版遗留：按特征匹配
+    return t.category===s[0] && Number(t.amount)===s[1] && (t.note||'')===s[2];
+  });
+}
+function stripSeed(tx){ return (tx||[]).filter(function(t){ return !isSeedTx(t); }); }
+
 function seedData(){
   const s = clone(DEFAULT_SETTINGS);
   const d = (n)=>{ const x=new Date(); x.setHours(12,0,0,0); x.setDate(x.getDate()-n); return x.getTime(); };
   const tx = [
-    {id:uid(), ts:d(4), direction:'in', group:'income', category:'工资', amount:8000, note:'八月工资到手'},
-    {id:uid(), ts:d(4), direction:'out', group:'fixed', category:'房租/房贷', amount:2500, note:'八月房租'},
-    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'餐饮', amount:32, note:'午饭+咖啡'},
-    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'购物', amount:199, note:'日用品补货'}
+    {id:uid(), ts:d(4), direction:'in', group:'income', category:'工资', amount:8000, note:'八月工资到手', _seed:true},
+    {id:uid(), ts:d(4), direction:'out', group:'fixed', category:'房租/房贷', amount:2500, note:'八月房租', _seed:true},
+    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'餐饮', amount:32, note:'午饭+咖啡', _seed:true},
+    {id:uid(), ts:d(2), direction:'out', group:'elastic', category:'购物', amount:199, note:'日用品补货', _seed:true}
   ];
   return { settings:s, tx };
 }
@@ -1969,6 +2016,7 @@ function refreshEditUI(){
 function confirmDelete(id){
   openModal('删除这笔记录？','删除后无法恢复，确定要删除吗？',async ()=>{
     S.tx=S.tx.filter(t=>t.id!==id);
+    TOMB[id]=Date.now(); saveTomb();   /* v38 记墓碑：删除动作才能同步到对端，避免"删了又复活" */
     if(editingId===id){ editingId=null; refreshEditUI(); }
     await safePersist();
     renderDashboard(); renderTxList(); renderCalendar(); toast('已删除');
@@ -1993,19 +2041,29 @@ function importJSON(file){
       if(!d.settings||!Array.isArray(d.tx)) throw new Error('格式不对');
       S.settings=Object.assign(clone(DEFAULT_SETTINGS),d.settings);
       S.tx=d.tx;
+      TOMB={}; saveTomb();   /* v38 导入=以备份为准，先清墓碑，否则备份里的记录会被旧墓碑过滤掉 */
       safePersist().then(()=>{ renderAll(); toast('已从备份恢复 '+d.tx.length+' 笔'); });
     }catch(e){ toast('导入失败：'+e.message); }
   };
   rd.readAsText(file);
 }
 function clearAll(){
-  openModal('清空全部数据？','将删除所有流水与设置并恢复示例值，此操作不可恢复。',async ()=>{
+  /* v38：启用云端同步时，清空的下一次同步会把空数据推上云端，等于"连云端备份一起清空"，
+     必须提前说清楚，并建议先导出备份。 */
+  var warn = (gist.enabled && gist.token)
+    ? '⚠️ 已启用云端同步：清空后，下次同步会同时清空云端备份，另一台设备的数据也会一并消失。<br>建议先点「导出 JSON 备份」。此操作不可恢复。'
+    : '将删除所有流水与设置并恢复示例值，此操作不可恢复。';
+  openModal('清空全部数据？', warn, async ()=>{
     localStorage.removeItem(KEY_TX); localStorage.removeItem(KEY_SET);
     S.settings=clone(DEFAULT_SETTINGS); S.tx=[];
-    const seed=seedData(); S.settings=seed.settings; S.tx=seed.tx;
+    TOMB={}; saveTomb();                       /* 墓碑一并清空，让"清空"是彻底的 */
+    /* v38：启用云端同步时不再塞示例数据——它不是用户输入，写进去会被当成真实数据扩散 */
+    if(!(gist.enabled && gist.token)){
+      const seed=seedData(); S.settings=seed.settings; S.tx=seed.tx;
+    }
     localStorage.setItem(KEY_SET,JSON.stringify(S.settings));
     localStorage.setItem(KEY_TX,JSON.stringify(S.tx));
-    renderAll(); toast('已重置为示例数据');
+    renderAll(); toast((gist.enabled && gist.token) ? '已清空（联网后云端也会清空）' : '已重置为示例数据');
   });
 }
 
@@ -2038,9 +2096,27 @@ async function boot(){
   setSync('busy','加载中…');
   document.getElementById('errZone').innerHTML='';
   try{
+    loadTomb();   /* v38 先载入本地墓碑，pullGist/applyTomb 依赖它 */
+    /* v38 核心修复：新设备（本地无任何数据）+ 已启用云端同步时，必须「先拉云端、再决定是否 seed」。
+       原流程是 loadAll() 先生成 4 笔示例数据 → 随后 gistInit() 的 pullGist() 用 mergeById
+       把「示例数据 ∪ 云端真实数据」合并成并集 → 网页端凭空多出示例数据，
+       且任何一次 persist 都会把这批假数据推回云端，再扩散到手机端。 */
+    const hasLocal = localStorage.getItem(KEY_TX)!==null || localStorage.getItem(KEY_SET)!==null;
+    if(gist.enabled && gist.token && gist.gistId && !hasLocal){
+      S.settings=clone(DEFAULT_SETTINGS); S.tx=[];   // 先置空，从源头杜绝 seed 混进来
+      try{ await pullGist(true); }catch(_){}
+    }
     const d=await Store.loadAll();
     S.settings=d.settings; S.tx=d.tx; S.error=null; S.ready=true;
     syncUi=null;
+    /* v38：已启用云端同步 → 示例数据一律清除。它不是用户输入，留着会持续污染两端。 */
+    if(gist.enabled && gist.token){
+      const n0=S.tx.length;
+      S.tx=stripSeed(S.tx);
+      if(S.tx.length!==n0){
+        try{ localStorage.setItem(KEY_TX, JSON.stringify(S.tx)); }catch(_){}
+      }
+    }
   }catch(e){
     // 读取失败：用默认设置兜底渲染界面，绝不白屏；顶部给出明确错误+重试
     S.error=e.message;
