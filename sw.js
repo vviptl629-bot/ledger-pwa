@@ -1,7 +1,7 @@
 // 打工人小账本 · Service Worker（离线缓存 app shell）
 // v31 全面静默化：所有 fetch / cache 操作都被多层 try-catch 包裹，
 // 避免 sandbox 端口偶发 ECONNREFUSED 透传到用户 console 干扰正常使用。
-const CACHE = 'ledger-pwa-v36';
+const CACHE = 'ledger-pwa-v37';
 const ASSETS = [
   './',
   './index.html',
@@ -51,10 +51,13 @@ function handleFetch(e){
     if (url.origin !== self.location.origin) return;
 
     // 导航请求（打开页面）走 network-first：每次优先拉服务器最新版，断网才用缓存
+    // v37 关键修复：GitHub Pages 返回 Cache-Control: max-age=600，
+    // 普通 fetch(request) 会直接命中浏览器 HTTP 缓存里的旧 index.html（SW 以为拿到的是最新），
+    // 导致"改完了手机还显示旧版"。加 cache:'reload' 强制回源，绕过这 10 分钟 HTTP 缓存。
     if (e.request.mode === 'navigate') {
       e.respondWith(
         swallow(
-          fetch(e.request).then((res) => {
+          fetch(new Request(e.request, { cache: 'reload' })).then((res) => {
             if (res && res.status === 200 && res.type === 'basic') {
               const copy = res.clone();
               swallow(caches.open(CACHE).then((c) => swallow(c.put(e.request, copy))));

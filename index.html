@@ -261,10 +261,9 @@
   .settle-grid-2x2 .settle-item.mint-final{background:#EAF7F0; border-color:var(--mint);}
   .settle-grid-2x2 .settle-item.mint-final .lab{color:var(--mint-deep);}
   .settle-grid-2x2 .settle-item.mint-final .val{font-size:24px;}
-  @media(max-width:480px){
-    .settle-grid-2x2 .settle-item .val{font-size:19px;}
-    .settle-grid-2x2 .settle-item.mint-final .val{font-size:21px;}
-  }
+  /* ⚠️ 原 @media(max-width:480px){ .val:19px } 已删除：
+     它位于后面的 @media(max-width:768px) 块之前，特异性相同，永远被 22px 覆盖，属死代码，
+     留着会让人误以为小屏(≤480px)生效的是 19px。移动端尺寸统一由 768px 块管理。 */
 
   /* 旧横向紧凑版（仍保留类目，3 列与 4 列），新布局用 settle-grid-2x2 替代 */
   .settle-row{display:grid; grid-template-columns:1fr 1fr 1fr; align-items:stretch; gap:0; background:var(--cream2); border:1px solid var(--line2); border-radius:14px; padding:6px;}
@@ -809,6 +808,17 @@
         <button class="btn warn" id="clearBtn">清空示例 / 全部数据</button>
         <input type="file" id="importFile" accept="application/json" style="display:none">
       </div>
+
+      <!-- v37 版本号：手机上看不到新改动时，先来这里确认版本，判断是否只是缓存没刷新 -->
+      <div class="card">
+        <h2><span id="icInfo"></span> 关于 · 版本</h2>
+        <p class="muted" style="margin-top:-4px;font-size:13px">
+          当前版本 <b id="appVersion" style="color:var(--mint-deep)">—</b>
+        </p>
+        <p class="muted" style="font-size:12px;margin-top:8px;line-height:1.6">
+          手机上没看到最新改动？先看上面的版本号。若不是最新，说明还在用旧缓存——在浏览器里清除本站数据，或卸载重装 PWA 即可。
+        </p>
+      </div>
     </section>
   </main>
 </div>
@@ -926,6 +936,8 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - local: 浏览器 localStorage（默认，零配置）
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
+/* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
+const APP_VERSION='v37';
 const ONLINE_ENDPOINT='';
 const DEFAULT_TOKEN_DAYS = 90;            // 默认 90 天
 const TOKEN_WARN_DAYS = 7;               // 到期前 N 天开始提醒
@@ -1115,7 +1127,7 @@ function setSync(state, text){
 /* =================== 渲染：图标占位（同 id 多元素都填，避免重复 id 漏渲染） =================== */
 function paintIcons(){
   const map={icHome:'home',icPen:'pen',icClock:'clock',icSlider:'slider',icGear:'gear',icBell:'bell',
-    icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield',icCal:'cal'};
+    icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield',icCal:'cal',icInfo:'warn'};
   for(const id in map){
     const html = ICON[map[id]];
     document.querySelectorAll('#'+id).forEach(el=>el.innerHTML=html);
@@ -1127,6 +1139,9 @@ function paintIcons(){
   // 小猪插画占位（v26 后已无 pigConvert/pigHourly 元素，仅保留 pigSide 兜底）
   const pigs={pigSide:''};
   for(const id in pigs){ const el=document.getElementById(id); if(el) el.innerHTML=''; }
+  // v37 版本号写入（设置页「关于 · 版本」），便于确认手机是否已刷到最新版
+  const verEl=document.getElementById('appVersion');
+  if(verEl) verEl.textContent=APP_VERSION;
 }
 
 /* =================== 视图切换 =================== */
@@ -2188,7 +2203,9 @@ if(ic) ic.onclick=()=>{ const b=document.getElementById('installBar'); if(b) b.s
 /* Service Worker（离线缓存 + 新版本自动刷新，避免一直看旧缓存） */
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').then(reg=>{
+    // v37：给 sw.js 加版本戳，确保 SW 脚本本身不被 Pages 的 max-age=600 缓存住
+    // （否则连"有没有新版本"都检测不到，自动刷新机制形同虚设）
+    navigator.serviceWorker.register('sw.js?v=' + APP_VERSION).then(reg=>{
       let reloaded=false;
       const onNew=()=>{ if(!reloaded){ reloaded=true; location.reload(); } };
       if(reg.waiting && navigator.serviceWorker.controller) onNew();
