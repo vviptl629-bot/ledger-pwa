@@ -1,7 +1,7 @@
 // 打工人小账本 · Service Worker（离线缓存 app shell）
 // v31 全面静默化：所有 fetch / cache 操作都被多层 try-catch 包裹，
 // 避免 sandbox 端口偶发 ECONNREFUSED 透传到用户 console 干扰正常使用。
-const CACHE = 'ledger-pwa-v39';
+const CACHE = 'ledger-pwa-v40';
 const ASSETS = [
   './',
   './index.html',

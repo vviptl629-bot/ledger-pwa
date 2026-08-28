@@ -251,7 +251,8 @@
   /* ============ 仪表盘新模块：月度结算条 / 排行榜 / 快记支出网格 ============ */
   /* 月度结算条 — v29 4 列等宽（收入/支出/结余/年结余），收入+支出可点击跳明细 */
   /* 月度结算 · 2×2 网格：收入/支出 在第一排，结余/年结余 在第二排，宽松留白更美观 */
-  .settle-grid-2x2{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:6px;}
+  /* v40：minmax(0,1fr) 防 min-content 撑大（与 cal-grid 同根因） */
+  .settle-grid-2x2{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px; padding:6px;}
   .settle-grid-2x2 .settle-item{padding:16px 12px; border-radius:14px; min-width:0; background:var(--cream2); border:1px solid var(--line2);}
   .settle-grid-2x2 .settle-item + .settle-item{position:static;}  /* 去掉旧的分隔线 ::before */
   .settle-grid-2x2 .settle-item + .settle-item::before{display:none;}
@@ -301,11 +302,13 @@
   .rank-pct{font-size:12px; color:var(--ink-soft); font-variant-numeric:tabular-nums; flex:none; min-width:36px; text-align:right}
 
   /* 快记支出 8 网格 */
-  .expense-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:6px}
+  /* v40：minmax(0,1fr) + .exp-cell min-width:0，防长名称（如"其他支出"）撑破 4 列网格 */
+  .expense-grid{display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-top:6px}
   .exp-cell{
     background:var(--cream2); border:1px solid var(--line2); border-radius:14px;
     display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 6px;
     cursor:pointer; transition:.15s; color:var(--ink); font:inherit;
+    min-width:0;   /* v40：grid item 锁定最小宽，长名称不会撑大 4 列网格 */
   }
   .exp-cell:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm)}
   .exp-cell:active{transform:scale(.97)}
@@ -349,8 +352,12 @@
   .cal-nav{width:40px; height:40px; border-radius:12px; border:1px solid var(--line); background:var(--cream2); font-size:24px; line-height:1; color:var(--ink-soft); cursor:pointer;}
   .cal-nav:hover{background:var(--mint-soft); color:var(--ink);}
   .cal-today{border:1px solid var(--line); background:var(--cream2); border-radius:12px; padding:0 14px; height:40px; font-size:14.5px; font-weight:700; color:var(--mint-deep); cursor:pointer;}
-  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:7px;}
-  .cal-cell{position:relative; min-height:60px; border-radius:13px; border:1px solid var(--line2); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 2px; font-size:15px; color:var(--ink-soft);}
+  /* v40：1fr → minmax(0,1fr)、cell 加 min-width:0，
+     防止「不截断的长内容」把整列撑大、最后一列被挤出卡片
+     （CSS Grid 经典坑：1fr 等价于 minmax(auto,1fr)，auto 取 min-content）。
+     这两项配齐后，下面的 text-overflow:ellipsis 才能真正生效。 */
+  .cal-grid{display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:7px;}
+  .cal-cell{position:relative; min-height:60px; min-width:0; border-radius:13px; border:1px solid var(--line2); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:6px 2px; font-size:15px; color:var(--ink-soft);}
   .cal-cell.wk{background:transparent; border:none; color:var(--ink-soft); font-weight:700; font-size:12.5px; min-height:auto; padding:0;}
   .cal-cell.empty{background:transparent; border:none;}
   .cal-cell .dnum{font-weight:700; color:var(--ink); font-size:16px;}
@@ -566,7 +573,7 @@
     .todo-item .txt small{font-size:12.5px;}
     .todo-item .act{padding:8px 14px; font-size:13px; min-height:38px;}
     /* v32 mix-row: 移动端改成 2 列并排，且去掉左右分割线 */
-    .mix-row{display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; flex-direction:unset; align-items:start;}
+    .mix-row{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:6px 10px; flex-direction:unset; align-items:start;}
     .mix-row > div:first-child{padding-right:0; border-right:none;}
     /* 移动端：donut 与 legend 在每个 cell 内纵向堆叠；v35 donut 放大到 104px */
     .mix-row > div{flex:unset;}
@@ -937,7 +944,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v39';
+const APP_VERSION='v40';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
