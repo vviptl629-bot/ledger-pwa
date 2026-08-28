@@ -998,6 +998,32 @@ async function pullGist(silent){
   }
 }
 async function syncNow(){ if(!gist.enabled||!gist.token){ syncStatus('请先启用同步','err'); return; } syncStatus('同步中…'); await pullGist(); await pushGist(); }
+// v34：云端/本地一致性自检——同时比对本地 S.tx 与云端 Gist 的 ledger-data.json
+async function checkConsistency(){
+  if(!gist.enabled||!gist.token||!gist.gistId){ syncStatus('请先启用云端同步','err'); toast('未启用同步，无法比对'); return; }
+  setSync('busy','检查中…');
+  try{
+    const g=await gistReq('GET',gist.gistId);
+    const f=g.files&&g.files[GIST_FILE];
+    if(!f||!f.content){ setSync('warn','需注意'); syncStatus('云端暂无数据 · 点「上传到云端」即可创建备份','warn'); toast('云端暂无数据'); return; }
+    const d=JSON.parse(f.content);
+    const cloudTx=Array.isArray(d.tx)?d.tx:[];
+    const localTx=S.tx||[];
+    const localIds=new Set(localTx.map(t=>(t&&t.id)||''));
+    const cloudIds=new Set(cloudTx.map(t=>(t&&t.id)||''));
+    const onlyLocal=localTx.filter(t=>t&&!cloudIds.has(t.id));
+    const onlyCloud=cloudTx.filter(t=>t&&!localIds.has(t.id));
+    const same=JSON.stringify(localTx)===JSON.stringify(cloudTx);
+    const lc=localTx.length, cc=cloudTx.length;
+    if(same){ setSync('ok','已连接'); syncStatus('✅ 完全一致 · 本地 '+lc+' 笔 = 云端 '+cc+' 笔','ok'); toast('✅ 完全一致'); return; }
+    let msg;
+    if(onlyLocal.length && !onlyCloud.length){ msg='⚠️ 本地比云端多 '+onlyLocal.length+' 笔，点「上传到云端」补齐'; setSync('warn','需注意'); }
+    else if(onlyCloud.length && !onlyLocal.length){ msg='⚠️ 云端比本地多 '+onlyCloud.length+' 笔，点「从云端拉取」补齐'; setSync('warn','需注意'); }
+    else { msg='⚠️ 不一致 · 本地独有 '+onlyLocal.length+' 笔 / 云端独有 '+onlyCloud.length+' 笔，点「上传」可双向合并'; setSync('warn','需注意'); }
+    syncStatus(msg+'（本地 '+lc+' · 云端 '+cc+'）','warn');
+    toast(msg);
+  }catch(e){ setSync('err','检查失败'); syncStatus('检查失败：'+(e&&e.message?e.message:e),'err'); toast('检查失败：'+e.message); }
+}
 var _autoPull=null;
 function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },45000); }
 function gistEnable(){
@@ -2081,12 +2107,12 @@ function renderSyncCard(){
       <div id="syncGistInfo" style="margin:6px 0 10px;font-size:13px;color:var(--sub)"></div>
       <div id="syncStatus" class="sync-status"></div>
       <div class="btn-row"><button class="btn ghost" id="gistPull">↓ 从云端拉取</button><button class="btn ghost" id="gistPush">↑ 上传到云端</button></div>
-      <div class="btn-row" style="margin-top:8px"><button class="btn warn" id="gistDisconnect">断开连接</button><button class="btn mint" id="gistCheck">检查 / 排错</button></div>`;
+      <div class="btn-row" style="margin-top:8px"><button class="btn warn" id="gistDisconnect">断开连接</button><button class="btn mint" id="gistCheck">检查云端一致性</button></div>`;
     showGistInfo();
     const pull=document.getElementById('gistPull'); if(pull) pull.onclick=async()=>{ try{ setSync('busy','同步中…'); await pullGist(); renderAll(); setSync('ok','已连接'); toast('已拉取 '+S.tx.length+' 笔'); }catch(e){ setSync('err','同步失败'); toast('拉取失败：'+e.message); } };
     const push=document.getElementById('gistPush'); if(push) push.onclick=async()=>{ try{ setSync('busy','推送中…'); await pushGist(); renderAll(); setSync('ok','已连接'); toast('已推送 '+S.tx.length+' 笔'); }catch(e){ setSync('err','推送失败'); toast('推送失败：'+e.message); } };
     const disc=document.getElementById('gistDisconnect'); if(disc) disc.onclick=gistDisable;
-    const chk=document.getElementById('gistCheck'); if(chk) chk.onclick=async()=>{ setSync('busy','检查中…'); try{ const r=await fetch('https://api.github.com/user',{headers:{'Authorization':'Bearer '+gist.token}}); if(r.ok){ setSync('ok','已连接'); syncStatus('✓ Token 有效','ok'); toast('✓ Token 有效'); } else { setSync('err','异常'); toast('返回 '+r.status); } }catch(e){ setSync('err','异常'); toast('检查失败：'+e.message); } };
+    const chk=document.getElementById('gistCheck'); if(chk) chk.onclick=checkConsistency;
   } else {
     el.innerHTML = `
       <p class="muted" style="margin:-4px 0 12px">当前仅本设备保存。开启 <b>GitHub Gist 同步</b> 后，手机和网页共享同一份数据 — 存在你 <b>自己的私有 Gist</b>，完全私有。</p>
