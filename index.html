@@ -937,7 +937,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v38';
+const APP_VERSION='v39';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -973,9 +973,29 @@ async function gistReq(method,id,body){
   if(!r.ok)throw new Error('GitHub '+r.status);
   return r.json();
 }
+/* v39 安全阀开关：仅在用户显式执行「清空云端」时短暂置 true 以绕过下面的保护。
+   平时恒为 false —— 任何"本地为空"的推送都会被拦下，避免误清空把云端历史抹掉。 */
+var FORCE_WIPE=false;
+
 async function pushGist(){
   if(!gist.enabled||!gist.token)return;
   try{
+    /* v39 安全阀：本地一条流水都没有、云端却还有数据时，**拒绝推送**。
+       出过事故：清空本地后 S.tx=[]，随后任何一次保存/关页 flush 都会把空数组推上去，
+       等于把云端 33 笔历史数据全部抹掉。这里做最后一道拦截。 */
+    if((S.tx||[]).length===0 && gist.gistId && !FORCE_WIPE){
+      try{
+        var _g=await gistReq('GET',gist.gistId);
+        var _f=_g.files&&_g.files[GIST_FILE];
+        if(_f&&_f.content){
+          var _d=JSON.parse(_f.content);
+          if(Array.isArray(_d.tx) && _d.tx.length>0){
+            syncStatus('⚠️ 已阻止一次清空云端：本地为空，但云端仍有 '+_d.tx.length+' 笔','warn');
+            return;
+          }
+        }
+      }catch(_){ /* 拉不到云端就不阻拦，免得网络问题导致永远存不上 */ }
+    }
     var body=gistPayload();
     if(!gist.gistId){
       var g=await gistReq('POST',null,{description:'打工人小账本数据同步',public:false,files:makeFiles(body)});
@@ -2048,10 +2068,11 @@ function importJSON(file){
   rd.readAsText(file);
 }
 function clearAll(){
-  /* v38：启用云端同步时，清空的下一次同步会把空数据推上云端，等于"连云端备份一起清空"，
-     必须提前说清楚，并建议先导出备份。 */
+  /* v39：清空**只作用于本设备**，云端备份一律保留。
+     出过事故：早期版本清空本地后会把空数据推上云端，导致云端历史被抹掉、不可恢复。
+     现在改为本地清空 + 云端保留，误点也能用「从云端拉取」救回来。 */
   var warn = (gist.enabled && gist.token)
-    ? '⚠️ 已启用云端同步：清空后，下次同步会同时清空云端备份，另一台设备的数据也会一并消失。<br>建议先点「导出 JSON 备份」。此操作不可恢复。'
+    ? '将清空<b>本设备</b>的流水与设置。<br>云端备份<b>会保留</b> —— 之后点「从云端拉取」即可恢复。<br>建议先「导出 JSON 备份」。'
     : '将删除所有流水与设置并恢复示例值，此操作不可恢复。';
   openModal('清空全部数据？', warn, async ()=>{
     localStorage.removeItem(KEY_TX); localStorage.removeItem(KEY_SET);
@@ -2063,7 +2084,7 @@ function clearAll(){
     }
     localStorage.setItem(KEY_SET,JSON.stringify(S.settings));
     localStorage.setItem(KEY_TX,JSON.stringify(S.tx));
-    renderAll(); toast((gist.enabled && gist.token) ? '已清空（联网后云端也会清空）' : '已重置为示例数据');
+    renderAll(); toast((gist.enabled && gist.token) ? '已清空本设备（云端保留，可拉取恢复）' : '已重置为示例数据');
   });
 }
 
