@@ -1516,6 +1516,16 @@ function renderExpenseRank(){
 
 /* 支出分类 8 网格（内联在"10 秒记一笔"卡片内，紧跟切换按钮）
    行为：点哪个 → pickedCat={c,g=elastic|c} → 高亮当前选中 → toggleKfcHolidayRow → 滚到金额框聚焦 */
+/* v36 单一渲染源：支出分类 chip 的内容（图标 + 名称）。
+   「支出分类」列表与负债的「这笔计入哪个支出分类」**共用此函数**，
+   确保两处图标形状、底色透明度、文字完全一致；以后改样式只改这里，杜绝两边漂移。
+   配色统一取自 EXP_CAT（不要再各自硬编码一份）。 */
+function expCellInner(name){
+  const cfg = EXP_CAT[name] || EXP_CAT['其他'];
+  return `<span class="exp-ico" style="background:${cfg.col}26;color:${cfg.col}">${ICON[cfg.icon]||ICON.tag}</span>
+    <span class="exp-name">${escapeHtml(name)}</span>`;
+}
+
 function renderExpenseGrid(){
   const el = document.getElementById('expenseGrid');
   if(!el) return;
@@ -1530,8 +1540,7 @@ function renderExpenseGrid(){
     {name:'其他',icon:'tag',col:'#EAE0CF'},
   ];
   el.innerHTML = `<div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${c.name}" data-group="elastic">
-    <span class="exp-ico" style="background:${c.col}26;color:${c.col}">${ICON[c.icon]||ICON.tag}</span>
-    <span class="exp-name">${c.name}</span>
+    ${expCellInner(c.name)}
   </button>`).join('')}</div>`;
   el.querySelectorAll('.exp-cell').forEach(b=>{
     b.onclick = ()=>{
@@ -1603,12 +1612,11 @@ function renderDebtExpChips(){
   const el = document.getElementById('debtExpChips');
   if(!el) return;
   el.innerHTML = `<div class="expense-grid">${EXP_FOR_DEBT.map(c=>{
-    const cfg = EXP_CAT[c] || {icon:'tag',col:'#EAE0CF'};
-    const active = (c===pickedExpCat);
-    /* v32 选中态：和负债主页"已选债务子类"一样的薄荷绿底白字；不要内联染背景（之前 1A 半透明盖住了 .exp-cell.on 的实绿底） */
-    return `<button class="exp-cell ${active?'on':''}" data-exp="${escapeHtml(c)}" style="${active?'':`border-color:${cfg.col};background:${cfg.col}1A`}">
-      <span class="exp-ico" style="background:${cfg.col}22;color:${cfg.col}">${ICON[cfg.icon]||ICON.tag}</span>
-      <span class="exp-name">${escapeHtml(c)}</span>
+    /* v36：与「支出分类」列表共用 expCellInner —— 图标形状/底色透明度/配色完全一致；
+       且不再内联染 chip 的边框与底色，未选中态与列表同为统一米色卡片，
+       选中态统一交给 .exp-cell.on（薄荷绿实底 + 白字），两处观感零差异 */
+    return `<button class="exp-cell ${c===pickedExpCat?'on':''}" data-exp="${escapeHtml(c)}">
+      ${expCellInner(c)}
     </button>`;
   }).join('')}</div>`;
   el.querySelectorAll('.exp-cell').forEach(b=>{
