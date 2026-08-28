@@ -10,7 +10,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#9FE0C4">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -43,7 +43,7 @@
     color:var(--ink); font-size:15px; line-height:1.55;
     min-height:100vh;
   }
-  .app{display:flex; min-height:100vh;}
+  .app{display:flex; min-height:100vh; min-height:100dvh;}
 
   /* ---------- 侧栏（桌面） ---------- */
   .sidebar{
@@ -72,14 +72,15 @@
   .side-foot{font-size:11px; color:var(--ink-soft); padding:8px 12px; line-height:1.5;}
 
   /* ---------- 主区 ---------- */
-  .main{flex:1; min-width:0; padding:18px 22px 40px; max-width:1100px; margin:0 auto; width:100%;}
+  .main{flex:1; min-width:0; padding:18px 22px 40px; max-width:760px; margin:0 auto; width:100%;}
   .topbar{display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
   .topbar h1{font-size:21px; margin:0; font-weight:800; letter-spacing:.5px;}
   .topbar .date{font-size:12.5px; color:var(--ink-soft); margin-left:auto;}
   .sync{
-    display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px;
+    display:none; align-items:center; gap:7px; padding:7px 12px; border-radius:999px;
     font-size:12.5px; font-weight:600; border:1px solid var(--line); background:var(--card);
-  }
+  } /* v28 默认隐藏（用户反馈"仅本地保存"那行小字无用）；已连接/异常时才显示 */
+  .sync.ok,.sync.busy,.sync.err,.sync.warn{display:inline-flex;}
   .sync .dot{width:9px; height:9px; border-radius:50%;}
   .sync.ok .dot{background:var(--ok);}
   .sync.err .dot{background:var(--ink-soft);}
@@ -136,8 +137,9 @@
   .todo-item .ic{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; flex:0 0 34px;}
   .todo-item.overdue .ic{background:#FBE0DB;}
   .todo-item .ic svg{width:19px; height:19px;}
-  .todo-item .txt{flex:1; font-size:13.5px;}
-  .todo-item .txt b{display:block; font-size:14px;}
+  .todo-item .txt{flex:1; font-size:15.5px; line-height:1.4;}
+  .todo-item .txt b{display:block; font-size:18px; font-weight:800; color:var(--ink); letter-spacing:.2px;}
+  .todo-item .txt small{font-size:12.5px; color:var(--ink-soft); font-weight:500; display:block; margin-top:2px;}
   .todo-item .act{
     border:none; background:var(--mint-deep); color:#fff; font-weight:700; border-radius:999px;
     padding:8px 14px; font-size:12.5px; cursor:pointer; min-height:38px;
@@ -147,6 +149,46 @@
   /* 表单 */
   label.fld{display:block; margin-bottom:13px;}
   label.fld .t{font-size:12.5px; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:5px;}
+  /* 输入框：显式字号/颜色/边框/内边距，避免小米浏览器等默认样式盖过文字 */
+  label.fld > input,
+  label.fld > textarea,
+  label.fld > select{
+    display:block; width:100%;
+    box-sizing:border-box;
+    font-size:17px; font-family:inherit; font-weight:600;
+    line-height:1.7;
+    color:var(--ink);
+    -webkit-appearance:none; appearance:none;
+    background:var(--card,#fff);
+    border:1.5px solid var(--line);
+    border-radius:12px;
+    padding:13px 14px;
+    margin:0;
+    min-height:50px;
+    vertical-align:middle;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  /* 数字 / 日期输入在小米浏览器里默认 vertical-align 偏上导致"半个字"，强制兜底 */
+  label.fld > input[type=number],
+  label.fld > input[type=date],
+  label.fld > input[type=text]{
+    line-height:1.7 !important;
+    padding-top:13px !important;
+    padding-bottom:13px !important;
+  }
+  label.fld > input:focus,
+  label.fld > textarea:focus,
+  label.fld > select:focus{
+    outline:none;
+    border-color:var(--mint-deep);
+    box-shadow:0 0 0 3px rgba(86,185,140,.18);
+  }
+  label.fld > input::placeholder,
+  label.fld > textarea::placeholder{ color:var(--ink-soft); opacity:.75; font-weight:500; }
+  /* 日期/数字输入在小米浏览器中的 spinner/箭头按钮：去掉避免推挤 */
+  input[type=date]::-webkit-calendar-picker-indicator,
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{ -webkit-appearance:none; appearance:none; margin:0; }
   input,select,textarea{
     width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px;
     font-size:16px; background:var(--cream2); color:var(--ink); font-family:inherit;
@@ -160,6 +202,8 @@
   .seg button.on{background:var(--mint-deep); color:#fff; border-color:var(--mint-deep);}
   .seg button.on.in{background:var(--income); border-color:var(--income);}
   .seg button.on.out{background:var(--expense); border-color:var(--expense);}
+  .seg button.on.debt{background:#D98E4A; border-color:#D98E4A; color:#fff;}
+  .seg button.debt:not(.on){color:#D98E4A;}
 
   .btn{
     border:none; border-radius:14px; padding:13px 18px; font-size:15px; font-weight:800;
@@ -199,21 +243,39 @@
   .sync-status.err{background:#FBE3DA; color:#A04236;}
 
   /* ============ 仪表盘新模块：月度结算条 / 排行榜 / 快记支出网格 ============ */
-  /* 月度结算条 — v22 紧凑三列等高 */
+  /* 月度结算条 — v29 4 列等宽（收入/支出/结余/年结余），收入+支出可点击跳明细 */
+  /* 月度结算 · 2×2 网格：收入/支出 在第一排，结余/年结余 在第二排，宽松留白更美观 */
+  .settle-grid-2x2{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:6px;}
+  .settle-grid-2x2 .settle-item{padding:16px 12px; border-radius:14px; min-width:0; background:var(--cream2); border:1px solid var(--line2);}
+  .settle-grid-2x2 .settle-item + .settle-item{position:static;}  /* 去掉旧的分隔线 ::before */
+  .settle-grid-2x2 .settle-item + .settle-item::before{display:none;}
+  .settle-grid-2x2 .settle-item .lab{font-size:11.5px; text-transform:none; letter-spacing:0; font-weight:600;}
+  .settle-grid-2x2 .settle-item .val{font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15; letter-spacing:-.3px;}
+  .settle-grid-2x2 .settle-item .sub{font-size:11.5px; color:var(--ink-soft); margin-top:2px;}
+  .settle-grid-2x2 .settle-item.mint-final{background:#EAF7F0; border-color:var(--mint);}
+  .settle-grid-2x2 .settle-item.mint-final .lab{color:var(--mint-deep);}
+  .settle-grid-2x2 .settle-item.mint-final .val{font-size:24px;}
+  @media(max-width:480px){
+    .settle-grid-2x2 .settle-item .val{font-size:19px;}
+    .settle-grid-2x2 .settle-item.mint-final .val{font-size:21px;}
+  }
+
+  /* 旧横向紧凑版（仍保留类目，3 列与 4 列），新布局用 settle-grid-2x2 替代 */
   .settle-row{display:grid; grid-template-columns:1fr 1fr 1fr; align-items:stretch; gap:0; background:var(--cream2); border:1px solid var(--line2); border-radius:14px; padding:6px;}
+  .settle-row-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+
+  /* 月度结算的可点击样式已废弃（v30）——不再需要 cursor/hover/active/::after 放大镜 */
   .settle-item{text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:8px 4px; border-radius:10px; min-width:0;}
   .settle-item + .settle-item{position:relative;}
   .settle-item + .settle-item::before{content:'';position:absolute;left:0;top:14%;bottom:14%;width:1px;background:var(--line2);}
   .settle-item .lab{font-size:10.5px; color:var(--ink-soft); font-weight:700; letter-spacing:.5px; text-transform:uppercase;}
   .settle-item .val{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1; letter-spacing:-.3px;}
   .settle-item .val.in{color:var(--income)} .settle-item .val.out{color:var(--expense)} .settle-item .val.mint{color:var(--mint-deep)}
-  .settle-item .sub{font-size:10.5px; color:var(--ink-soft); font-weight:600;}
   .settle-final{background:#EAF7F0;}
   .settle-final .lab{color:var(--mint-deep);}
-  .settle-final .sub{color:var(--mint-deep);opacity:.85;}
-  .settle-final .val{font-size:21px;}
-  .settle-op{display:none;}  /* v22 删除，减噪 */
-  .settle-meta{margin-top:10px; font-size:11.5px; color:var(--ink-soft); text-align:center;}
+  .settle-final .val{font-size:19px;}
+  .settle-row-4 .settle-item .val{font-size:16px;}
+  .settle-row-4 .settle-item .lab{font-size:10px;}
   .month-card{background:linear-gradient(180deg,#FFFDF7,#FFFDF7);}
   /* 月份 chip 小尺寸分段器 */
   .seg-sm button{flex:0 0 auto; min-width:50px; min-height:32px; padding:5px 10px; font-size:12px; border-radius:9px}
@@ -272,6 +334,33 @@
   .tx:last-child{border-bottom:none;}
   .tx .ic{width:36px; height:36px; border-radius:11px; display:grid; place-items:center; flex:0 0 36px; background:var(--cream2); box-shadow:inset 0 0 0 1px var(--line2);}
   .tx .ic svg{width:18px; height:18px;}
+  .tx .ic.debt{background:#FBEFE2; color:#D98E4A;}
+  .tx .ic.in{background:#E4F4EC; color:var(--income);} .tx .ic.fixed{background:#EAF0F7; color:#5B86C5;} .tx .ic.elastic{background:#FBEEE6; color:var(--expense);}
+
+  /* 本月日历 */
+  .cal-head{display:flex; align-items:center; gap:8px; margin:2px 0 12px;}
+  .cal-month{font-weight:800; font-size:15px; flex:1; color:var(--ink);}
+  .cal-nav{width:34px; height:34px; border-radius:10px; border:1px solid var(--line); background:var(--cream2); font-size:20px; line-height:1; color:var(--ink-soft); cursor:pointer;}
+  .cal-nav:hover{background:var(--mint-soft); color:var(--ink);}
+  .cal-today{border:1px solid var(--line); background:var(--cream2); border-radius:10px; padding:0 12px; height:34px; font-size:13px; font-weight:700; color:var(--mint-deep); cursor:pointer;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+  .cal-cell{position:relative; min-height:46px; border-radius:11px; border:1px solid var(--line2); background:var(--cream); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:4px 0; font-size:13px; color:var(--ink-soft);}
+  .cal-cell.wk{background:transparent; border:none; color:var(--ink-soft); font-weight:700; font-size:11px; min-height:auto; padding:0;}
+  .cal-cell.empty{background:transparent; border:none;}
+  .cal-cell .dnum{font-weight:700; color:var(--ink); font-size:13px;}
+  .cal-cell .dnet{font-size:10px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1;}
+  .cal-cell.pos{background:#E9F6EF; border-color:#C9E7D6;}
+  .cal-cell.pos .dnet{color:#2E9E6B;}
+  .cal-cell.neg{background:#FBEBE8; border-color:#F2CFC7;}
+  .cal-cell.neg .dnet{color:#D2604F;}
+  .cal-cell.zero .dnet{color:transparent;}
+  .cal-cell.today{border-color:var(--mint-deep); box-shadow:inset 0 0 0 1.5px var(--mint-deep);}
+  .cal-cell.today .dnum{color:var(--mint-deep);}
+  .cal-cell[data-day]{cursor:pointer;}
+  .cal-cell[data-day]:hover{filter:brightness(.98);}
+  .cal-cell.on{background:var(--mint-soft); border-color:var(--mint-deep);}
+  .cal-day{margin-top:14px; border-top:1px dashed var(--line2); padding-top:12px;}
+  .cal-day-title{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px;}
   .tx .ic.in{background:#E4F4EC;} .tx .ic.fixed{background:#EAF0F7;} .tx .ic.elastic{background:#FBEEE6;}
   .tx .info{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px;}
   .tx .info .c{
@@ -376,39 +465,124 @@
 
   .skeleton{color:var(--ink-soft); text-align:center; padding:40px; font-size:14px;}
 
+  /* v32 收支双圈卡片：桌面左右两段（保持原桌面观感），移动端切换为上下两段在 mix-row 内 */
+  .mix-row{display:flex; flex-direction:row; gap:18px; align-items:flex-start;}
+  .mix-row > div{flex:1; min-width:0;}
+  .mix-row > div:first-child{padding-right:14px; border-right:1px dashed var(--line2);}
+
   /* 底部Tab（手机） */
   .bottomtab{display:none;}
   @media(max-width:768px){
     .sidebar{display:none;}
-    .main{padding:12px 12px 110px;}
+    /* v31 主页比例紧凑化：padding/margin/字号全部微调，避免底部大段留白、整页内容稀疏 */
+    .main{padding:8px 10px 72px;}      /* 顶部 8 / 左右 10 / 底部 72（贴 dock，不再多留 24px 空白） */
     .bottomtab{
       display:flex; position:fixed; bottom:0; left:0; right:0; z-index:50;
       background:#FFFCF6; backdrop-filter:blur(8px);
-      border-top:1px solid #CDEADD; padding:6px 6px calc(8px + env(safe-area-inset-bottom));
+      border-top:1px solid #CDEADD; padding:5px 4px calc(8px + env(safe-area-inset-bottom));
       justify-content:space-around;
       box-shadow:0 -6px 16px rgba(91,82,73,.08);
     }
     .bt{
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:3px; padding:5px 2px; flex:1 0 0; max-width:88px;
-      cursor:pointer; color:var(--ink-soft); font-size:11px; font-weight:600;
+      gap:3px; padding:6px 2px; flex:1 0 0; max-width:none;
+      cursor:pointer; color:var(--ink-soft); font-size:11.5px; font-weight:600;
       -webkit-tap-highlight-color:transparent;
     }
     .bt svg{width:22px; height:22px; flex:0 0 22px; display:block;}
     .bt.active{color:var(--mint-deep);}
-    /* 紧凑卡片 */
-    .card{padding:13px 14px; margin-bottom:12px; border-radius:14px;}
-    .card h2{font-size:14.5px; margin:0 0 10px; gap:7px;}
-    .card h2 svg{width:17px; height:17px;}
-    .grid{gap:10px;}
+    /* v32 紧凑卡片再次收紧：让"今天-收入组合-月度结算-支出分类"4 张关键卡在一屏可见 */
+    .main{padding:6px 9px 64px;}
+    .card{padding:9px 11px; margin-bottom:7px; border-radius:13px;}
+    .card h2{font-size:13.5px; margin:0 0 6px; gap:6px;}
+    .card h2 svg{width:16px; height:16px;}
+    .grid{gap:8px;}
+    /* 顶部主标题行紧凑 */
+    .topbar{padding:8px 12px; margin-bottom:10px;}
+    .topbar h1{font-size:17px;}
     /* 概览进度环缩小 */
-    .ring{width:78px; height:78px; flex:0 0 78px;}
-    .ring .mid .p{font-size:15px;}
-    .ring .mid .s{font-size:9.5px;}
-    .ring-info .t{font-size:13px;}
-    .ring-info .d{font-size:12px;}
+    .ring{width:66px; height:66px; flex:0 0 66px;}
+    .ring .mid .p{font-size:14px;}
+    .ring .mid .s{font-size:9px;}
+    .ring-info .t{font-size:12.5px;}
+    .ring-info .d{font-size:11.5px;}
+    /* 仪表盘 section 卡片间距再压缩一点 */
+    #view-dashboard .card{margin-bottom:7px;}
+    #view-dashboard .card .tape{width:48px; height:16px; top:-7px;}
     /* 收入组合donut缩 */
-    .income-mix svg{width:96px !important; height:96px !important;}
+    .income-mix svg{width:80px !important; height:80px !important;}
+    #incomeMix > div{gap:10px !important;}
+    #incomeMix > div > div:first-child{width:88px !important; height:88px !important;}
+    #incomeMix > div > div:first-child svg{width:88px !important; height:88px !important;}
+    #incomeMix > div > div:first-child > div > div:first-child{font-size:12.5px !important;}
+    #incomeMix > div > div:first-child > div > div:last-child{font-size:9.5px !important;}
+    #incomeMix legend, #incomeMix > div > div:last-child{gap:3px !important;}
+    #incomeMix legend > div, #incomeMix > div > div:last-child > div{padding:1px 0 !important; font-size:11.5px !important;}
+    /* 支出分类占比donut缩 */
+    #expenseMix > div{gap:12px !important;}
+    #expenseMix > div > div:first-child{width:88px !important; height:88px !important;}
+    #expenseMix > div > div:first-child svg{width:88px !important; height:88px !important;}
+    #expenseMix > div > div:first-child > div > div:first-child{font-size:13px !important;}
+    #expenseMix > div > div:first-child > div > div:last-child{font-size:9.5px !important;}
+    #expenseMix > div > div:last-child{gap:2px 8px !important;}
+    #expenseMix > div > div:last-child > div{font-size:11.5px !important; padding:1px 0 !important;}
+    /* 月度结算2x2 紧凑 */
+    .settle-grid-2x2{padding:4px; gap:8px;}
+    .settle-grid-2x2 .settle-item{padding:10px 8px;}
+    .settle-grid-2x2 .settle-item .lab{font-size:10.5px;}
+    .settle-grid-2x2 .settle-item .val{font-size:17px;}
+    .settle-grid-2x2 .settle-item.mint-final .val{font-size:18.5px;}
+    .settle-grid-2x2 .settle-item .sub{font-size:10.5px;}
+    /* 7天趋势高度上限 */
+    #expenseTrend svg{max-height:90px; max-width:100% !important;}
+    /* 排行榜紧凑 */
+    .rank-row{padding:6px 0; gap:7px;}
+    .rank-ico{width:24px; height:24px; border-radius:8px;}
+    .rank-ico svg{width:14px; height:14px;}
+    .rank-no{width:18px; height:18px; font-size:10.5px;}
+    .rank-name{font-size:12.5px;}
+    .rank-amt{font-size:12.5px;}
+    .rank-pct{font-size:10.5px;}
+    .rank-bar{height:4px;}
+    /* 卡片标题前置 tape 缩小 */
+    .card .tape{width:48px; height:16px; top:-7px;}
+    /* 今日待处理紧凑 */
+    .todo-item{padding:10px 12px; gap:9px; margin-bottom:6px; border-radius:12px;}
+    .todo-item .ic{width:30px; height:30px; flex:0 0 30px; border-radius:9px;}
+    .todo-item .ic svg{width:17px; height:17px;}
+    .todo-item .txt{font-size:14.5px;}
+    .todo-item .txt b{font-size:16px;}
+    .todo-item .txt small{font-size:11.5px;}
+    .todo-item .act{padding:7px 12px; font-size:12px; min-height:34px;}
+    /* v32 mix-row: 移动端改成 2 列并排，且去掉左右分割线 */
+    .mix-row{display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; flex-direction:unset; align-items:start;}
+    .mix-row > div:first-child{padding-right:0; border-right:none;}
+    /* 移动端：donut 与 legend 在每个 cell 内纵向堆叠；donut 80px */
+    .mix-row > div{flex:unset;}
+    #incomeMix > div, #expenseMix > div{flex-direction:column !important; align-items:center !important; gap:6px !important;}
+    #incomeMix > div > div:first-child, #expenseMix > div > div:first-child{width:80px !important; height:80px !important;}
+    #incomeMix > div > div:first-child svg, #expenseMix > div > div:first-child svg{width:80px !important; height:80px !important;}
+    #incomeMix > div > div:first-child > div > div:first-child, #expenseMix > div > div:first-child > div > div:first-child{font-size:12.5px !important;}
+    #incomeMix > div > div:first-child > div > div:last-child, #expenseMix > div > div:first-child > div > div:last-child{font-size:9px !important;}
+    /* legend：分别控制 */
+    #incomeMix > div > div:last-child{display:flex !important; flex-direction:column !important; gap:2px !important; min-width:0 !important; width:100% !important; align-items:stretch !important;}
+    #incomeMix > div > div:last-child > div{font-size:11px !important; padding:0 !important; gap:4px !important;}
+    #expenseMix > div > div:last-child{display:grid !important; grid-template-columns:1fr 1fr !important; gap:1px 4px !important; min-width:0 !important; width:100% !important;}
+    #expenseMix > div > div:last-child > div{font-size:10.5px !important; padding:0 !important; gap:3px !important;}
+ .bottomtab{
+      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:50;
+      background:#FFFCF6; backdrop-filter:blur(8px);
+      border-top:1px solid #CDEADD; padding:4px 4px calc(6px + env(safe-area-inset-bottom));
+      justify-content:space-around;
+      box-shadow:0 -6px 16px rgba(91,82,73,.08);
+    }
+    .bt{
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:2px; padding:5px 2px 4px; flex:1 0 0; max-width:none;
+      cursor:pointer; color:var(--ink-soft); font-size:11px; font-weight:600;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .bt svg{width:21px; height:21px; flex:0 0 21px; display:block;}
   }
 
   /* toast */
@@ -444,8 +618,8 @@
     <div class="nav-item" data-view="record">
       <span id="icPen"></span> 10秒记账
     </div>
-    <div class="nav-item" data-view="hourly">
-      <span id="icClock"></span> 真实时薪
+    <div class="nav-item" data-view="calendar">
+      <span id="icCal"></span> 日历
     </div>
     <div class="nav-item" data-view="simulate">
       <span id="icSlider"></span> 情景模拟
@@ -485,13 +659,16 @@
         <div id="todoList"><div class="skeleton">加载中…</div></div>
       </div>
 
-      <!-- 仪表盘新顺序 v23：收入组合 → 月度结算 → 支出三件套 → 4 格速览（真实时薪/月收入/固定支出/结余） → 存款曲线（最末） -->
-      <div class="card">
-        <h2><span id="icMix"></span> 收入组合 · 钱从哪来</h2>
-        <div id="incomeMix"></div>
+      <!-- v32 仪表盘重排：把"收入组合"和"支出分类占比"合并成"收支双圈"卡片（移动端左右两列），关键 4 卡一屏可见 -->
+      <div class="card" id="mixCard">
+        <h2><span id="icMix"></span> 收支分类占比</h2>
+        <div class="mix-row">
+          <div id="incomeMix"></div>
+          <div id="expenseMix"></div>
+        </div>
       </div>
 
-      <!-- 月度结算条：DOCK 上方，含月份切换 8月/9月/全部 -->
+      <!-- 月度结算条（含月份切换 + 2×2 数据） -->
       <div class="card month-card" id="monthCard">
         <div class="tape"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -501,12 +678,6 @@
           </div>
         </div>
         <div id="monthSettlement" style="margin-top:12px"></div>
-      </div>
-
-      <!-- 支出三件套：占比 + 近7天趋势 + 排行榜 -->
-      <div class="card">
-        <h2><span id="icMix"></span> 支出分类占比</h2>
-        <div id="expenseMix"></div>
       </div>
 
       <div class="card">
@@ -519,18 +690,7 @@
         <div id="expenseRank"></div>
       </div>
 
-      <!-- 4 格速览：真实时薪 / 本月收入 / 本月固定支出 / 本月结余（从 todoList 下方移到这里） -->
-      <div class="grid g4" id="dashStats">
-        <div class="skeleton">加载中…</div>
-      </div>
-
-      <!-- 存款曲线（最末） -->
-      <div class="card">
-        <h2><span id="icChart"></span> 存款曲线 · 你的自由进度</h2>
-        <div id="depositChart"></div>
-      </div>
-
-      <!-- （仪表盘不放 8 分类网格，移到记账页"支出"标签下方） -->
+      <!-- 自由基金&安全垫 / 存款曲线 v27 已移除（用户反馈意义不大，留出空间给月度结算与年度结余） -->
     </section>
 
     <!-- 记账 -->
@@ -541,6 +701,7 @@
         <div class="seg" id="dirSeg">
           <button data-dir="out" class="on out">支出</button>
           <button data-dir="in" class="in">收入</button>
+          <button data-dir="debt" class="debt">负债</button>
         </div>
         <div style="height:14px"></div>
 
@@ -553,6 +714,14 @@
           <p class="muted" id="pickerHint" style="margin:-4px 0 12px">点哪个就是这笔的分类，下面只填金额和日期。</p>
           <div id="pickerOut"><div id="expenseGrid"></div></div>
           <div id="pickerIn" style="display:none"><div id="incomeChips"></div></div>
+          <div id="pickerDebt" style="display:none">
+            <div id="debtChips"></div>
+            <!-- v31 负债二级选择：这笔计入哪个支出分类（房贷→居住 等），用户可改 -->
+            <div id="debtExpWrap" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line2)">
+              <div class="muted" style="font-size:11.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; margin-bottom:8px">这笔计入哪个支出分类</div>
+              <div id="debtExpChips"></div>
+            </div>
+          </div>
         </div>
 
         <div style="height:10px"></div>
@@ -571,18 +740,10 @@
         <label class="fld"><span class="t">备注</span>
           <input type="text" id="noteInp" placeholder="奶茶 / 午饭 / 房租…" maxlength="40">
         </label>
-        <div class="convert" id="convertBox" style="display:none">
-          <span class="pig" id="pigConvert"></span>
-          <div>
-            <div class="big" id="convertBig">—</div>
-            <div class="sub" id="convertSub">先填金额，看看它值你多少个小时</div>
-          </div>
-        </div>
         <div style="height:10px"></div>
         <button class="btn" id="saveBtn">保存这笔</button>
+        <button class="btn ghost" id="cancelEditBtn" style="display:none; margin-top:8px">取消编辑</button>
       </div>
-
-      <!-- （"支出分类"已并入上方"10 秒记一笔"卡片内，取代旧的"分类"下拉） -->
 
       <div class="card">
         <h2><span id="icList"></span> 全部流水 <span class="muted" id="txCount"></span>
@@ -592,64 +753,21 @@
         <div id="txList"><div class="skeleton">加载中…</div></div>
       </div>
     </section>
-
-    <!-- 真实时薪（含反推条） -->
-    <section class="view" id="view-hourly">
+    <section class="view" id="view-calendar">
       <div class="card">
         <div class="tape"></div>
-        <h2><span id="icClock"></span> 真实时薪计算器</h2>
-        <p class="muted" style="margin:-4px 0 14px">工资不止看月薪——把成本、通勤、加班都算进去，才是你真正"卖"出去的每小时价钱。</p>
-        <div class="grid g2">
-          <label class="fld"><span class="t">综合到手月薪（¥）</span>
-            <input type="number" id="s_net" inputmode="decimal"></label>
-          <label class="fld"><span class="t">一年发薪月数</span>
-            <input type="number" id="s_pay" inputmode="numeric"></label>
-          <label class="fld"><span class="t">每月工作成本（饭/咖啡/杂费 ¥）</span>
-            <input type="number" id="s_cost" inputmode="decimal"></label>
-          <label class="fld"><span class="t">每天在场时间（小时）</span>
-            <input type="number" id="s_present" inputmode="decimal"></label>
-          <label class="fld"><span class="t">每天通勤时间（小时）</span>
-            <input type="number" id="s_commute" inputmode="decimal"></label>
-          <label class="fld"><span class="t">每月工作天数</span>
-            <input type="number" id="s_days" inputmode="numeric"></label>
-          <label class="fld"><span class="t">每月加班（小时）</span>
-            <input type="number" id="s_ot" inputmode="decimal"></label>
-          <label class="fld"><span class="t">当前存款 / 本金（¥）</span>
-            <input type="number" id="s_save" inputmode="decimal"></label>
+        <h2><span id="icCal"></span> 月度日历 · 每日收支</h2>
+        <div class="cal-head">
+          <button class="cal-nav" id="calPrev" title="上个月">‹</button>
+          <span class="cal-month" id="calMonthLabel">—</span>
+          <button class="cal-nav" id="calNext" title="下个月">›</button>
+          <button class="cal-today" id="calToday">今天</button>
         </div>
-        <div class="btn-row">
-          <button class="btn ghost" id="hourlyReset">恢复示例值</button>
+        <div id="cal"></div>
+        <div class="cal-day">
+          <div class="cal-day-title" id="calDayTitle">点击日期看当天明细</div>
+          <div id="calDay"></div>
         </div>
-        <div class="convert" style="margin-top:14px">
-          <span class="pig" id="pigHourly"></span>
-          <div>
-            <div class="big" id="hourlyHeadline">¥0 / 小时</div>
-            <div class="sub" id="hourlySub">真实时薪 = 年净到手 ÷ 年总耗时</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2><span id="icSlider"></span> 反推：调整一下看时薪怎么变</h2>
-        <p class="muted" style="margin:-4px 0 14px">拖动滑块会同步更新上方输入并即时重算。涨薪分子、加时分母——谈薪永远是最划算的事。</p>
-        <div class="simrow">
-          <div class="sim"><div class="hd"><span id="icBus"></span> 通勤</div>
-            <div class="muted">每天 <b id="simCommuteVal">2.0</b> 小时</div>
-            <input type="range" id="simCommute" min="0" max="4" step="0.5" value="2"></div>
-          <div class="sim"><div class="hd"><span id="icOt"></span> 加班</div>
-            <div class="muted">每月 <b id="simOtVal">20</b> 小时</div>
-            <input type="range" id="simOt" min="0" max="120" step="5" value="20"></div>
-          <div class="sim"><div class="hd"><span id="icUp"></span> 涨薪</div>
-            <div class="muted">幅度 <b id="simRaiseVal">0</b> %</div>
-            <input type="range" id="simRaise" min="0" max="50" step="1" value="0"></div>
-        </div>
-        <div id="simCompare" style="margin-top:14px"></div>
-      </div>
-
-      <!-- 自由基金 & 安全垫（从仪表盘移到这里，靠近自由进度语义） -->
-      <div class="card">
-        <h2><span id="icTarget"></span> 自由基金 & 安全垫</h2>
-        <div id="fundRings"></div>
       </div>
     </section>
 
@@ -662,49 +780,6 @@
         <div class="tape"></div>
         <h2><span id="icCloud"></span> 云端同步 · 手机 ↔ 网页</h2>
         <div id="syncCard"></div>
-      </div>
-
-      <div class="card">
-        <div class="tape"></div>
-        <h2><span id="icTarget"></span> 自由基金 & 安全垫目标</h2>
-        <div class="grid g2">
-          <label class="fld"><span class="t">自由基金目标本金（¥）</span>
-            <input type="number" id="g_freedom" inputmode="decimal"></label>
-          <label class="fld"><span class="t">安全垫目标（¥）</span>
-            <input type="number" id="g_safety" inputmode="decimal"></label>
-          <label class="fld"><span class="t">年提取率（%）</span>
-            <input type="number" id="g_rate" inputmode="decimal"></label>
-          <label class="fld"><span class="t">当前存款 / 本金（¥）</span>
-            <input type="number" id="g_save" inputmode="decimal"></label>
-        </div>
-        <div class="btn-row">
-          <button class="btn ghost" id="saveGoals">保存目标</button>
-        </div>
-        <p class="muted" style="margin-top:6px">自由基金 = 你不再出卖时间也能生活的"本金"；安全垫 = 3~6 个月开销的应急钱。</p>
-      </div>
-
-      <div class="card">
-        <div class="tape"></div>
-        <h2><span id="icCoin"></span> 收入组合来源</h2>
-        <p class="muted" style="margin:-4px 0 14px">把副业 / 兼职单价填好，记账换算更准。KFC 平时 ¥22/时；只有 <b>法定休假日</b>（春节 / 国庆 / 元旦 / 劳动节等法定节假日）才是 ¥48/时，<b>双休日周末不算</b>。</p>
-        <div class="grid g2">
-          <label class="fld"><span class="t">KFC 平时单价（¥/时）</span>
-            <input type="number" id="kfcNormal" inputmode="decimal"></label>
-          <label class="fld"><span class="t">KFC 法定休假日单价（¥/时）</span>
-            <input type="number" id="kfcHoliday" inputmode="decimal"></label>
-        </div>
-        <div class="btn-row">
-          <button class="btn ghost" id="saveKfc">保存单价</button>
-        </div>
-        <div style="height:14px"></div>
-        <div class="tape" style="background:var(--mint)"></div>
-        <h2 style="margin-top:4px"><span id="icUp"></span> 一键导入收入表</h2>
-        <p class="muted" style="margin:-4px 0 12px">选你的《认证费用登记表》xlsx，自动把「每日服务费汇总」和「KFC」两个表生成本月收入流水，按日期去重、不重复导入。</p>
-        <div class="btn-row">
-          <button class="btn" id="importXlsxBtn">选择 Excel 文件导入</button>
-          <input type="file" id="xlsxFile" accept=".xlsx,.xls" style="display:none">
-        </div>
-        <div id="importLog" class="muted" style="margin-top:8px"></div>
       </div>
 
       <div class="card">
@@ -726,7 +801,7 @@
 <nav class="bottomtab">
   <div class="bt active" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
   <div class="bt" data-view="record"><span id="icPen2"></span>记账</div>
-  <div class="bt" data-view="hourly"><span id="icClock2"></span>时薪</div>
+  <div class="bt" data-view="calendar"><span id="icCal2"></span>日历</div>
   <div class="bt" data-view="settings"><span id="icGear2"></span>设置</div>
 </nav>
 
@@ -742,7 +817,6 @@
   </div>
 </div>
 
-<script src="xlsx.full.min.js"></script>
 <script>
 /* =================== 图标（内联SVG，禁用emoji） =================== */
 const ICON = {
@@ -761,6 +835,8 @@ const ICON = {
   ot:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/></svg>',
   up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
   shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>',
+  debt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h5"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1 9.5-9.5a2 2 0 0 0-3-3L5 16z"/></svg>',
@@ -807,6 +883,25 @@ const CATS = {
   out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],
   out_elastic:['餐饮','交通','购物','娱乐','居住','医疗','学习','其他']
 };
+const DEBT_CATS = ['房贷','花呗/信用卡','借呗/网贷','亲友借款','其他负债'];
+const DEBT_COL = '#D98E4A'; /* 负债：琥珀色，与支出(红)/收入(绿)明显区分 */
+
+/* v31 负债子类 → 支出分类 默认映射（用户仍可在二级 chip 里手动改）：
+   房贷         → 居住（每月固定房贷本质是居住支出）
+   花呗/信用卡  → 购物（消费用途最常见，可改）
+   借呗/网贷    → 其他（资金周转，难以绑定单一类目）
+   亲友借款     → 其他
+   其他负债     → 其他
+   用户选的支出分类会写入 tx.category（用于月度结余/分类占比），负债子类写入 tx.debtCat（仅用于负债维度）。 */
+const DEBT_TO_EXP_DEFAULT = {
+  '房贷':'居住',
+  '花呗/信用卡':'购物',
+  '借呗/网贷':'其他',
+  '亲友借款':'其他',
+  '其他负债':'其他'
+};
+const EXP_FOR_DEBT = CATS.out_elastic; /* 负债二级 chip：8 个支出分类 */
+let pickedExpCat = '居住';  /* 负债模式下当前选中的支出分类（用户可改），切回支出/收入时清空 */
 
 let S = { settings:null, tx:[], error:null, ready:false };
 
@@ -977,62 +1072,54 @@ function setSync(state, text){
 /* =================== 渲染：图标占位（同 id 多元素都填，避免重复 id 漏渲染） =================== */
 function paintIcons(){
   const map={icHome:'home',icPen:'pen',icClock:'clock',icSlider:'slider',icGear:'gear',icBell:'bell',
-    icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield'};
+    icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield',icCal:'cal'};
   for(const id in map){
     const html = ICON[map[id]];
     document.querySelectorAll('#'+id).forEach(el=>el.innerHTML=html);
   }
   // 底部 Tab 图标（已删"模拟" Tab，所以不写 icSlider2）—— 所有调用统一加 null 保护
-  const tabIcons={icHome2:'home',icPen2:'pen',icClock2:'clock',icGear2:'gear'};
+  const tabIcons={icHome2:'home',icPen2:'pen',icClock2:'clock',icGear2:'gear',icCal2:'cal'};
   for(const id in tabIcons){ document.querySelectorAll('#'+id).forEach(el=>el.innerHTML=ICON[tabIcons[id]]); }
   // 小猪插画占位（可能因版本调整被删除，统一 null 保护）
-  const pigs={pigSide:'',pigConvert:'',pigHourly:''};
-  for(const id in pigs){ const el=document.getElementById(id); if(el) el.innerHTML=PIG(pigs[id]); }
+  // 小猪插画占位（v26 后已无 pigConvert/pigHourly 元素，仅保留 pigSide 兜底）
+  const pigs={pigSide:''};
+  for(const id in pigs){ const el=document.getElementById(id); if(el) el.innerHTML=''; }
 }
 
 /* =================== 视图切换 =================== */
-const TITLES={dashboard:'仪表盘',record:'10秒记账',hourly:'真实时薪',simulate:'情景模拟',settings:'我的设置'};
+const TITLES={dashboard:'仪表盘',record:'10秒记账',calendar:'日历',simulate:'情景模拟',settings:'我的设置'};
+const SET_LAST_VIEW='wb_ledger_lastview_v1'; /* v28 记忆上次停留页面，刷新不跳首页 */
 function switchView(v){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
   document.querySelectorAll('.bt').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
   document.getElementById('pageTitle').textContent=TITLES[v];
-  if(v==='record'){ renderExpenseGrid(); renderIncomeChips(); syncPickerArea(); }
-  if(v==='hourly'){ fillHourlyInputs(); syncSimSliders(); renderFundRings(); }
-  if(v==='settings'){ fillGoalInputs(); fillKfcInputs(); renderSyncCard(); }
+  if(v==='record'){ renderExpenseGrid(); renderIncomeChips(); renderDebtChips(); syncPickerArea(); }
+  if(v==='calendar'){ renderCalendar(); showCalDay(dateOnly(Date.now())); }
+  if(v==='settings'){ renderSyncCard(); }
   window.scrollTo(0,0);
+  try{ localStorage.setItem(SET_LAST_VIEW, v); }catch(_){}
 }
 
-/* 自由基金 & 安全垫（仅渲染到时薪视图的 #fundRings） */
+/* 自由基金 & 安全垫 v27 已从仪表盘移除；函数保留为历史兼容占位 */
 function renderFundRings(){
   const el=document.getElementById('fundRings');
   if(!el) return;
-  const s=S.settings;
-  el.innerHTML = `
-    <div class="ring-wrap" style="margin-bottom:16px">
-      ${ringSVG(pct(s.currentSavings,s.freedomGoal), fmt0(s.currentSavings), '自由基金')}
-      <div class="ring-info"><div class="t">自由基金</div><div class="d">目标 ${fmt0(s.freedomGoal)}<br>还差 ${fmt0(Math.max(0,s.freedomGoal-s.currentSavings))}</div></div>
-    </div>
-    <div class="ring-wrap">
-      ${ringSVG(pct(s.currentSavings,s.safetyGoal), fmt0(s.currentSavings), '安全垫')}
-      <div class="ring-info"><div class="t">安全垫</div><div class="d">目标 ${fmt0(s.safetyGoal)}<br>${s.currentSavings>=s.safetyGoal?'已达成 ✓':('还差 '+fmt0(s.safetyGoal-s.currentSavings))}</div></div>
-    </div>`;
 }
 
 /* =================== 仪表盘 =================== */
 function renderDashboard(){
   const s=S.settings, tx=S.tx;
-  const h=calcHourly(s);
   // 今日待处理
   const today=dateOnly(Date.now());
   const hasToday=tx.some(t=>dateOnly(t.ts)===today);
   const todos=[];
-  if(!hasToday) todos.push({overdue:false,title:'今天还没记账哦',sub:'记一笔，看看它值你多少个小时',act:'去记账',view:'record'});
-  if(todos.length===0) todos.push({overdue:false,title:'今天都搞定啦',sub:'保持节奏，自由一点点靠近',act:'记一笔',view:'record'});
+  if(!hasToday) todos.push({overdue:false,title:'今天还没记账哦',sub:'',act:'去记账',view:'record'});
+  if(todos.length===0) todos.push({overdue:false,title:'今天都搞定啦',sub:'',act:'记一笔',view:'record'});
   document.getElementById('todoList').innerHTML = todos.map(t=>`
     <div class="todo-item ${t.overdue?'overdue':''}">
       <span class="ic">${ICON[t.overdue?'warn':'check']}</span>
-      <span class="txt"><b>${escapeHtml(t.title)}</b>${escapeHtml(t.sub)}</span>
+      <span class="txt"><b>${escapeHtml(t.title)}</b></span>
       <button class="act" data-go="${t.view}">${escapeHtml(t.act)}</button>
     </div>`).join('');
   document.querySelectorAll('#todoList .act').forEach(b=>b.onclick=()=>{ if(b.dataset.go==='record') switchView('record'); });
@@ -1043,22 +1130,70 @@ function renderDashboard(){
   const inc = cur.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
   const fixed = cur.filter(t=>t.group==='fixed').reduce((a,t)=>a+t.amount,0);
   const elas = cur.filter(t=>t.group==='elastic').reduce((a,t)=>a+t.amount,0);
-  const bal = inc - fixed - elas;
-  document.getElementById('dashStats').innerHTML = `
-    <div class="stat"><div class="lab">${ICON.coin} 真实时薪</div><div class="val mint">${fmt0(h.hourly)}<small>/时</small></div></div>
-    <div class="stat"><div class="lab">${ICON.coin} 本月收入</div><div class="val in">${fmt2(inc)}</div></div>
-    <div class="stat"><div class="lab">${ICON.list} 本月固定支出</div><div class="val out">${fmt0(fixed)}</div></div>
-    <div class="stat"><div class="lab">${ICON.chart} 本月结余</div><div class="val ${bal>=0?'mint':'out'}">${fmt2(bal)}</div></div>`;
+  const debt = cur.filter(t=>t.group==='debt').reduce((a,t)=>a+t.amount,0);
+  const out = fixed + elas + debt;
+  const bal = inc - out;
 
-  // 存款曲线
-  document.getElementById('depositChart').innerHTML = depositChartSVG(tx, s.currentSavings);
-
-  // 仪表盘新模块：月度结算条 + 支出三件套 + 快记 8 网格
+  // 仪表盘新模块：月度结算条（v30 2×2 布局：收入/支出/结余/年结余）+ 支出三件套
   renderMonthlySettlement();
   renderExpenseMix();
   renderExpenseTrend();
   renderExpenseRank();
   renderIncomeMix();
+}
+
+/* =================== 本月日历 =================== */
+let calRef = new Date();
+function renderCalendar(){
+  const el=document.getElementById('cal');
+  if(!el) return;
+  const y=calRef.getFullYear(), m=calRef.getMonth();
+  const first=new Date(y,m,1);
+  const startDow=first.getDay();
+  const days=new Date(y,m+1,0).getDate();
+  const byDay={};
+  S.tx.forEach(t=>{
+    const d=dateOnly(t.ts);
+    (byDay[d]=byDay[d]||{inc:0,out:0});
+    if(t.direction==='in') byDay[d].inc+=t.amount; else byDay[d].out+=t.amount;
+  });
+  const todayStr=dateOnly(Date.now());
+  const wk=['日','一','二','三','四','五','六'];
+  let cells=wk.map(w=>`<div class="cal-cell wk">${w}</div>`).join('');
+  for(let i=0;i<startDow;i++) cells+='<div class="cal-cell empty"></div>';
+  for(let d=1;d<=days;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const s=byDay[ds]||{inc:0,out:0};
+    const net=s.inc-s.out;
+    const has=(s.inc+s.out)>0;
+    const cls=[has?(net>=0?'pos':'neg'):'zero'];
+    if(ds===todayStr) cls.push('today');
+    const netTxt = has ? (net>=0?'+':'−')+fmt(Math.abs(net)) : '';
+    cells+=`<button class="cal-cell ${cls.join(' ')}" data-day="${ds}">
+        <span class="dnum">${d}</span>
+        ${has?`<span class="dnet">${netTxt}</span>`:''}
+      </button>`;
+  }
+  el.innerHTML=`<div class="cal-grid">${cells}</div>`;
+  const lab=document.getElementById('calMonthLabel');
+  if(lab) lab.textContent=`${y}年${m+1}月`;
+  el.querySelectorAll('.cal-cell[data-day]').forEach(b=>b.onclick=()=>showCalDay(b.dataset.day));
+}
+function showCalDay(ds){
+  calSelected = ds;
+  const items=S.tx.filter(t=>dateOnly(t.ts)===ds).sort((a,b)=>b.ts-a.ts);
+  const title=document.getElementById('calDayTitle');
+  if(title) title.textContent=ds+' · '+(items.length?items.length+' 笔':'无记录');
+  const panel=document.getElementById('calDay');
+  if(panel) panel.innerHTML = items.length? items.map(txRow).join('') : '<div class="muted">这一天还没有记账～</div>';
+  // 绑定 calDay 面板内每条 tx 的编辑/删除
+  if(panel){
+    panel.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>confirmDelete(b.dataset.del));
+    panel.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editTx(b.dataset.edit));
+  }
+  document.querySelectorAll('#cal .cal-cell').forEach(c=>c.classList.remove('on'));
+  const sel=document.querySelector(`#cal .cal-cell[data-day="${ds}"]`);
+  if(sel) sel.classList.add('on');
 }
 
 /* =================== 收入组合占比 =================== */
@@ -1117,7 +1252,9 @@ function setViewMonth(m){
   renderExpenseRank();
 }
 
-/* 月度结算条：自动 8月/9月/全部 + 收入 − 支出 = 结余 */
+/* v30 删除"点击触达明细"：取消 setTxFilter / TX_FILTER / 记账页方向筛选 chip。tx 列表恢复展示全部流水。 */
+
+/* 月度结算（v30 2×2 布局）：第一排 收入 / 支出，第二排 本月结余 / 年度结余；不可点击 */
 function renderMonthlySettlement(){
   const seg = document.getElementById('monthSeg');
   const box = document.getElementById('monthSettlement');
@@ -1142,28 +1279,54 @@ function renderMonthlySettlement(){
       seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.m===m));
     };
   });
-  // 选定月份汇总
+  // 选定月份汇总（收入/支出）
   const filtered = VIEW_MONTH==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===VIEW_MONTH);
   const inc = filtered.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
   const out = filtered.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
   const bal = inc - out;
-  const cnt = filtered.length;
   const incN = filtered.filter(t=>t.direction==='in').length;
   const outN = filtered.filter(t=>t.direction==='out').length;
+  const cnt = filtered.length;
   if(cnt === 0){
     box.innerHTML = `<div class="muted" style="padding:22px 0;text-align:center">${VIEW_MONTH==='全部'?'还没有任何流水～点底部"记账"开始你的第一笔':'该月还没有数据，录一笔试试～'}</div>`;
     return;
   }
+  // 年度结余：当前年份所有月份累计（独立维度，与月度 chip 无关）
+  const yr = new Date().getFullYear();
+  const yrTx = S.tx.filter(t=> new Date(t.ts).getFullYear()===yr);
+  const yrInc = yrTx.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
+  const yrOut = yrTx.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  const yrBal = yrInc - yrOut;
+  const yrN = yrTx.length;
+  const yrCls = yrBal>=0?'mint':'out';
+  const balCls = bal>=0?'mint':'out';
+  // 第一排：收入 / 支出（白底小卡）；第二排：结余 / 年度结余（薄荷绿/淡红强调卡）
   box.innerHTML = `
-    <div class="settle-row">
-      <div class="settle-item"><div class="lab">收入</div><div class="val in">${fmt2(inc)}</div><div class="sub">${incN} 笔</div></div>
-      <div class="settle-op">−</div>
-      <div class="settle-item"><div class="lab">支出</div><div class="val out">${fmt2(out)}</div><div class="sub">${outN} 笔</div></div>
-      <div class="settle-op">=</div>
-      <div class="settle-item settle-final"><div class="lab">结余</div><div class="val ${bal>=0?'mint':'out'}">${fmt2(bal)}</div><div class="sub">${bal>=0?'攒下了':'超支'}</div></div>
-    </div>
-    <div class="settle-meta">${VIEW_MONTH==='全部'?'所有月份累计':'仅 '+VIEW_MONTH } · 共 ${cnt} 笔 · 支出率 ${inc>0?Math.round(out/inc*100):0}%</div>`;
+    <div class="settle-grid-2x2">
+      <div class="settle-item">
+        <div class="lab">本月收入</div>
+        <div class="val in">${fmt2(inc)}</div>
+        <div class="sub">${incN} 笔</div>
+      </div>
+      <div class="settle-item">
+        <div class="lab">本月支出</div>
+        <div class="val out">${fmt2(out)}</div>
+        <div class="sub">${outN} 笔</div>
+      </div>
+      <div class="settle-item ${bal>=0?'mint-final':''}">
+        <div class="lab">${VIEW_MONTH==='全部'?'累计结余':'本月结余'}</div>
+        <div class="val ${balCls}">${fmt2(bal)}</div>
+        <div class="sub">${bal>=0?'攒下了':'超支'}</div>
+      </div>
+      <div class="settle-item ${yrBal>=0?'mint-final':''}">
+        <div class="lab">${yr} 年结余</div>
+        <div class="val ${yrCls}">${fmt2(yrBal)}</div>
+        <div class="sub">${yrBal>=0?'本年攒下了':'本年超支'} · ${yrN} 笔</div>
+      </div>
+    </div>`;
 }
+
+/* v29 旧的紧凑"年度结余"独立卡已删，年度结余合并进月度结算 4 列卡 */
 
 /* 支出分类 8 大类（图表色彩 + 图标），老分类别名 → 新图标的兜底映射 */
 const EXP_CAT = {
@@ -1308,7 +1471,7 @@ function renderExpenseRank(){
 }
 
 /* 支出分类 8 网格（内联在"10 秒记一笔"卡片内，紧跟切换按钮）
-   行为：点哪个 → pickedCat={c,g=elastic|c} → 高亮当前选中 → toggleKfcHolidayRow → updateConvert → 滚到金额框聚焦 */
+   行为：点哪个 → pickedCat={c,g=elastic|c} → 高亮当前选中 → toggleKfcHolidayRow → 滚到金额框聚焦 */
 function renderExpenseGrid(){
   const el = document.getElementById('expenseGrid');
   if(!el) return;
@@ -1331,7 +1494,6 @@ function renderExpenseGrid(){
       pickedCat = { c: b.dataset.cat, g: b.dataset.group };
       highlightPicker();
       toggleKfcHolidayRow();
-      updateConvert();
       const main = document.querySelector('.main') || document.body;
       main.scrollTop = 0;
       window.scrollTo(0,0);
@@ -1357,7 +1519,6 @@ function renderIncomeChips(){
       pickedCat = { c: b.dataset.cat, g: 'income' };
       highlightPicker();
       toggleKfcHolidayRow();
-      updateConvert();
       const main = document.querySelector('.main') || document.body;
       main.scrollTop = 0;
       window.scrollTo(0,0);
@@ -1368,9 +1529,55 @@ function renderIncomeChips(){
   highlightPicker();
 }
 
-/* 高亮当前 pickedCat 对应的 cell */
+/* 负债分类 5 chip（房贷/花呗信用卡/借呗网贷/亲友借款/其他负债）
+   选中负债子类后，会自动给"对应支出分类"二级 chip 设置一个推荐默认值（用户可改） */
+function renderDebtChips(){
+  const el = document.getElementById('debtChips');
+  if(!el) return;
+  const cats = DEBT_CATS;
+  el.innerHTML = `<div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${escapeHtml(c)}" data-group="debt">
+    <span class="exp-ico" style="background:${DEBT_COL}22;color:${DEBT_COL}">${ICON.debt||ICON.shield}</span>
+    <span class="exp-name">${escapeHtml(c)}</span>
+  </button>`).join('')}</div>`;
+  el.querySelectorAll('.exp-cell').forEach(b=>{
+    b.onclick = ()=>{
+      pickedCat = { c: b.dataset.cat, g: 'debt' };
+      // v31：选完负债后，自动给"支出分类"二级 chip 高亮推荐默认值
+      pickedExpCat = DEBT_TO_EXP_DEFAULT[pickedCat.c] || '其他';
+      renderDebtExpChips();
+      highlightPicker();
+      toast(`已选「${pickedCat.c}」→ 计入「${pickedExpCat}」（可改）`);
+      setTimeout(()=>document.getElementById('amtInp')?.focus(), 60);
+    };
+  });
+  highlightPicker();
+}
+
+/* v31 负债二级 chip：选择这笔计入哪个支出分类（8 个支出分类）；
+   用于把负债也纳入"支出分类占比"和"月度结余"。 */
+function renderDebtExpChips(){
+  const el = document.getElementById('debtExpChips');
+  if(!el) return;
+  el.innerHTML = `<div class="expense-grid">${EXP_FOR_DEBT.map(c=>{
+    const cfg = EXP_CAT[c] || {icon:'tag',col:'#EAE0CF'};
+    const active = (c===pickedExpCat);
+    /* v32 选中态：和负债主页"已选债务子类"一样的薄荷绿底白字；不要内联染背景（之前 1A 半透明盖住了 .exp-cell.on 的实绿底） */
+    return `<button class="exp-cell ${active?'on':''}" data-exp="${escapeHtml(c)}" style="${active?'':`border-color:${cfg.col};background:${cfg.col}1A`}">
+      <span class="exp-ico" style="background:${cfg.col}22;color:${cfg.col}">${ICON[cfg.icon]||ICON.tag}</span>
+      <span class="exp-name">${escapeHtml(c)}</span>
+    </button>`;
+  }).join('')}</div>`;
+  el.querySelectorAll('.exp-cell').forEach(b=>{
+    b.onclick = ()=>{
+      pickedExpCat = b.dataset.exp;
+      renderDebtExpChips();
+      toast(`计入「${pickedExpCat}」`);
+      setTimeout(()=>document.getElementById('amtInp')?.focus(), 60);
+    };
+  });
+}
 function highlightPicker(){
-  document.querySelectorAll('#expenseGrid .exp-cell, #incomeChips .exp-cell').forEach(b=>{
+  document.querySelectorAll('#expenseGrid .exp-cell, #incomeChips .exp-cell, #debtChips .exp-cell').forEach(b=>{
     const on = (b.dataset.cat===pickedCat.c);
     b.classList.toggle('on', on);
   });
@@ -1381,106 +1588,42 @@ function highlightPicker(){
 function syncPickerArea(){
   const out=document.getElementById('pickerOut');
   const inn=document.getElementById('pickerIn');
+  const dbt=document.getElementById('pickerDebt');
   const t=document.getElementById('pickerTitleText');
   const h=document.getElementById('pickerHint');
   const ic=document.getElementById('pickerIc');
   if(curDir==='out'){
-    out.style.display='';
-    inn.style.display='none';
+    out.style.display=''; inn.style.display='none'; dbt.style.display='none';
     t.textContent='支出分类';
     h.textContent='点哪个就是这笔的分类，下面只填金额和日期。';
     ic.innerHTML = ICON.pen;
-    // 若 pickedCat 是收入分类，重置为支出默认「餐饮」
-    if(pickedCat.g==='income'){
+    // 若 pickedCat 不是支出分类，重置为支出默认「餐饮」
+    if(pickedCat.g!=='elastic' && pickedCat.g!=='fixed'){
       pickedCat = {c:'餐饮', g:'elastic'};
     }
-  }else{
-    out.style.display='none';
-    inn.style.display='';
+  }else if(curDir==='in'){
+    out.style.display='none'; inn.style.display=''; dbt.style.display='none';
     t.textContent='收入分类';
     h.textContent='点哪个就是这笔的来源，下面只填金额和日期。';
     ic.innerHTML = ICON.coin;
-    // 若 pickedCat 是支出分类，重置为收入默认「KFC兼职」
-    if(pickedCat.g==='elastic' || pickedCat.g==='fixed'){
+    // 若 pickedCat 不是收入分类，重置为收入默认「KFC兼职」
+    if(pickedCat.g!=='income'){
       pickedCat = {c:'KFC兼职', g:'income'};
     }
+  }else{ // debt
+    out.style.display='none'; inn.style.display='none'; dbt.style.display='';
+    t.textContent='负债分类';
+    h.textContent='先选负债（房贷/花呗信用卡等），再选计入哪个支出分类，下面填金额日期。';
+    ic.innerHTML = ICON.debt||ICON.shield;
+    // 若 pickedCat 不是负债分类，重置为负债默认「房贷」，并按映射给出支出分类默认
+    if(pickedCat.g!=='debt'){
+      pickedCat = {c:'房贷', g:'debt'};
+    }
+    pickedExpCat = DEBT_TO_EXP_DEFAULT[pickedCat.c] || '其他';
+    renderDebtExpChips();
   }
   highlightPicker();
   toggleKfcHolidayRow();
-}
-
-/* 导入收入表（解析 xlsx 的「每日服务费汇总」「KFC」两表） */
-function excelSerialToTs(serial){
-  if(serial==null||serial===''||isNaN(serial)) return null;
-  const s=Number(serial);
-  if(!(s>20000)) return null;
-  return new Date((s-25569)*86400*1000).getTime();
-}
-function hasIncomeOn(ts,category){
-  const d=dateOnly(ts);
-  return S.tx.some(t=>t.direction==='in'&&t.category===category&&dateOnly(t.ts)===d);
-}
-async function importIncomeXlsx(){
-  const f=document.getElementById('xlsxFile').files[0];
-  if(!f) return;
-  const log=document.getElementById('importLog');
-  log.textContent='解析中…';
-  try{
-    const buf=await f.arrayBuffer();
-    const wb=XLSX.read(buf,{type:'array'});
-    let added=0, skipped=0;
-    const findSheet=(pred)=>wb.SheetNames.find(pred);
-    const svcName=findSheet(n=>n.includes('服务费')||n.includes('每日'));
-    if(svcName){
-      const rows=XLSX.utils.sheet_to_json(wb.Sheets[svcName],{header:1,defval:null,blankrows:false});
-      let hdr=-1;
-      for(let i=0;i<rows.length;i++){ if(Array.isArray(rows[i])&&rows[i].some(c=>c==='日期')&&rows[i].some(c=>String(c).includes('服务费合计'))){ hdr=i; break; } }
-      if(hdr>=0){
-        for(let i=hdr+1;i<rows.length;i++){
-          const r=rows[i]; if(!r||r.length<3) continue;
-          const svc=r[2]; if(svc==null||svc===0||svc==='') continue;
-          const ts=excelSerialToTs(r[0]); if(!ts) continue;
-          if(hasIncomeOn(ts,'认证服务费')){ skipped++; continue; }
-          S.tx.push({id:uid(),ts,direction:'in',group:'income',category:'认证服务费',amount:Math.round(Number(svc)*100)/100,note:'服务费 '+(r[3]||'')+' 笔（来自收入表）'});
-          added++;
-        }
-      }
-    }
-    const kfcName=findSheet(n=>n.toUpperCase()==='KFC');
-    if(kfcName){
-      const rows=XLSX.utils.sheet_to_json(wb.Sheets[kfcName],{header:1,defval:null,blankrows:false});
-      let hdr=-1;
-      for(let i=0;i<rows.length;i++){ if(Array.isArray(rows[i])&&rows[i].some(c=>c==='日期')&&rows[i].some(c=>String(c).includes('合计'))){ hdr=i; break; } }
-      if(hdr>=0){
-        for(let i=hdr+1;i<rows.length;i++){
-          const r=rows[i]; if(!r||r.length<5) continue;
-          const total=r[4]; if(total==null||total===0||total==='') continue;
-          const ts=excelSerialToTs(r[0]); if(!ts) continue;
-          if(hasIncomeOn(ts,'KFC兼职')){ skipped++; continue; }
-          const rateTxt=(r[3]&&r[3]!==22)?(' @'+r[3]):'';
-          S.tx.push({id:uid(),ts,direction:'in',group:'income',category:'KFC兼职',amount:Math.round(Number(total)*100)/100,note:'KFC '+(r[2]||'')+' 时'+rateTxt+'（来自收入表）'});
-          added++;
-        }
-      }
-    }
-    await safePersist();
-    renderDashboard(); renderTxList();
-    log.textContent=`导入完成：新增 ${added} 笔收入，跳过重复 ${skipped} 笔。`;
-    toast(added>0?'已导入 '+added+' 笔收入':'没有新增（都已导入过）');
-  }catch(e){
-    log.textContent='导入失败：'+e.message;
-    toast('导入失败');
-  }
-}
-async function saveKfc(){
-  S.settings.kfcRateNormal=num('kfcNormal')||22;
-  S.settings.kfcRateHoliday=num('kfcHoliday')||48;
-  await safePersist();
-  toast('KFC 单价已保存');
-}
-function fillKfcInputs(){
-  document.getElementById('kfcNormal').value=S.settings.kfcRateNormal;
-  document.getElementById('kfcHoliday').value=S.settings.kfcRateHoliday;
 }
 
 /* 存款曲线 SVG */
@@ -1528,7 +1671,8 @@ function ringSVG(p, midMain, midSub){
 /* 主分类（如命中 EXP_CAT）：catcol 为该类色；否则按 direction/group 兜底 */
 function catColorOf(cat, dir){
   if(EXP_CAT[cat]) return EXP_CAT[cat].col;
-  if(dir==='in') return '#56B98C';
+  if(dir==='in' || dir==='income') return '#56B98C';
+  if(dir==='debt') return DEBT_COL;
   return '#7FC8A9';
 }
 /* 把主色变浅做 chip 背景（透明度 14%），深色做文字色；边框用主色 32% */
@@ -1537,12 +1681,12 @@ function catChipStyle(cat, dir){
   return `--catbg:${col}22;--catbd:${col}55;--catcol:${col};--catfg:${col};`;
 }
 function txRow(t){
-  const cls = t.direction==='in'?'in':(t.group==='fixed'?'fixed':'elastic');
-  const icon = t.direction==='in'?ICON.coin : (t.group==='fixed'?ICON.shield:ICON.pen);
+  const cls = t.direction==='in'?'in':(t.group==='fixed'?'fixed':(t.group==='debt'?'debt':'elastic'));
+  const icon = t.direction==='in'?ICON.coin : (t.group==='fixed'?ICON.shield:(t.group==='debt'?ICON.debt:ICON.pen));
   const sign = t.direction==='in'?'+':'−';
   const col = t.direction==='in'?'in':'out';
   const chip = escapeHtml(t.category||'其他');
-  const style = catChipStyle(t.category, t.direction);
+  const style = catChipStyle(t.category, t.group);
   return `<div class="tx">
     <span class="ic ${cls}">${icon}</span>
     <span class="info">
@@ -1551,20 +1695,23 @@ function txRow(t){
     </span>
     <span class="amt ${col}">${sign}${fmt(t.amount)}</span>
     <span class="ops">
-      <button data-del="${t.id}" title="删除">${ICON.trash}</button>
+      <button data-edit="${t.id}" title="编辑" aria-label="编辑">${ICON.edit}</button>
+      <button data-del="${t.id}" title="删除" aria-label="删除">${ICON.trash}</button>
     </span>
   </div>`;
 }
 
 function renderTxList(){
   const sorted=[...S.tx].sort((a,b)=>b.ts-a.ts);
-  document.getElementById('txCount').textContent='共 '+sorted.length+' 笔';
+  // v30 取消方向筛选：展示全部流水
+  const filtered = sorted;
+  document.getElementById('txCount').textContent='共 '+filtered.length+' 笔';
   const listEl=document.getElementById('txList');
-  if(!sorted.length){ listEl.innerHTML='<div class="muted">还没有记录～</div>'; return; }
+  if(!filtered.length){ listEl.innerHTML='<div class="muted" style="padding:18px 0;text-align:center">该方向还没有记录～</div>'; return; }
   // v23：月份一级折叠 + 月内按 category 二级折叠
   const cur = monthKey(Date.now());
   const byMonth = {};
-  sorted.forEach(t=>{
+  filtered.forEach(t=>{
     const k = monthKey(t.ts) || '未知';
     (byMonth[k]=byMonth[k]||[]).push(t);
   });
@@ -1597,7 +1744,8 @@ function renderTxList(){
     });
     const inner = catKeys.map(ck=>{
       const its = byCat[ck];
-      const dir = its[0].direction==='in' ? 'in' : 'out';
+      const g0 = its[0].group;
+      const dir = g0==='in' ? 'in' : (g0==='debt' ? 'debt' : 'out');
       const sum = its.reduce((s,t)=>s+t.amount,0);
       const sign = dir==='in' ? '+' : '−';
       const catCol = catColorOf(ck, dir);
@@ -1627,7 +1775,10 @@ function renderTxList(){
       <div class="grow">${inner}</div>
     </details>`;
   }).join('');
-  document.querySelectorAll('#txList [data-del]').forEach(b=>b.onclick=()=>confirmDelete(b.dataset.del));
+  // 绑定删除/编辑（同时覆盖 txList 与 calDay 两个面板）
+  const allOps=document.querySelectorAll('#txList [data-del], #calDay [data-del]');
+  allOps.forEach(b=>b.onclick=()=>confirmDelete(b.dataset.del));
+  document.querySelectorAll('#txList [data-edit], #calDay [data-edit]').forEach(b=>b.onclick=()=>editTx(b.dataset.edit));
   const ta=document.getElementById('toggleAll');
   if(ta){
     const anyClosed = [...listEl.querySelectorAll('details.txgroup')].some(d=>!d.open);
@@ -1646,180 +1797,119 @@ function renderTxList(){
    default=支出/餐饮(elastic)，由 syncPickerArea 根据当前 dirSeg 决定初始值。 */
 let pickedCat = {c:'餐饮', g:'elastic'};
 let curDir='out';
+let editingId = null;       /* 当前正在修改的 tx.id；null=新增模式 */
+let calSelected = '';       /* 月历选中的日期，刷新后保持 */
 function toggleKfcHolidayRow(){
   const row=document.getElementById('kfcHolidayRow'); if(!row) return;
   const show = curDir==='in' && pickedCat.c==='KFC兼职';
   row.style.display = show?'flex':'none';
   if(!show){ const c=document.getElementById('kfcHolidayChk'); if(c) c.checked=false; }
 }
-function updateConvert(){
-  const amt=parseFloat(document.getElementById('amtInp').value);
-  const box=document.getElementById('convertBox');
-  if(!(amt>0)){ box.style.display='none'; return; }
-  const cat=pickedCat.c;
-  const hMain=calcHourly(S.settings).hourly;
-  const isKfc = cat==='KFC兼职';
-  const isSvc = cat==='认证服务费';
-  const kfcHoliday = isKfc && document.getElementById('kfcHolidayChk') && document.getElementById('kfcHolidayChk').checked;
-  const rate = isKfc ? (kfcHoliday ? (Number(S.settings.kfcRateHoliday)||48) : (Number(S.settings.kfcRateNormal)||22)) : hMain;
-  const hrs = rate>0? amt/rate : 0;
-  const hh=Math.floor(hrs), mm=Math.round((hrs-hh)*60);
-  const time = hh>0? `${hh} 小时 ${mm} 分` : `${mm} 分`;
-  box.style.display='flex';
-  if(curDir==='in'){
-    if(isKfc){
-      document.getElementById('convertBig').textContent='≈ KFC '+time;
-      document.getElementById('convertSub').textContent=`按 ¥${rate}/时（${kfcHoliday?'法定休假日':'平时'}），这笔 KFC 收入 ≈ KFC 干 ${time}`;
-    }else if(isSvc){
-      const certH=Math.round(amt/2*100)/100;
-      document.getElementById('convertBig').textContent='≈ 认证工作 2 小时';
-      document.getElementById('convertSub').textContent=`这笔服务费 = 你那天做认证（预约登记1h+送件1h）约 2 小时换来的；当日认证时薪 ≈ ¥${certH}/时`;
-    }else{
-      document.getElementById('convertBig').textContent='≈ 主业 '+time;
-      document.getElementById('convertSub').textContent='这笔收入 ≈ 主业干 '+time+' 的价值';
-    }
-  }else{
-    document.getElementById('convertBig').textContent='≈ 工作 '+time;
-    document.getElementById('convertSub').textContent='这笔花掉的钱，需要你埋头干 '+time;
-  }
-}
 async function saveTx(){
   const amt=parseFloat(document.getElementById('amtInp').value);
   if(!(amt>0)){ toast('先填一个大于 0 的金额'); return; }
-  let category, group;
+  let category, group, debtCat=null;
   if(curDir==='in'){ category=pickedCat.c; group='income'; }
+  else if(curDir==='debt'){
+    debtCat = pickedCat.c;            /* 负债子类（如「房贷」） */
+    category = pickedExpCat;          /* 计入哪个支出分类（如「居住」） */
+    group = 'debt';
+  }
   else { category=pickedCat.c; group=pickedCat.g; }
   let note=document.getElementById('noteInp').value.trim();
   if(curDir==='in' && category==='KFC兼职' && document.getElementById('kfcHolidayChk') && document.getElementById('kfcHolidayChk').checked){
     note=(note? note+' · ':'')+'法定休假日¥48/时';
   }
+  // v31 负债记账：note 加上负债子类（方便流水列表/排行榜一眼看出）
+  if(curDir==='debt' && debtCat){
+    note = (note? note+' · ':'') + `${debtCat}（负债）`;
+  }
   const dval=document.getElementById('dateInp').value;
   const ts = dval ? new Date(dval+'T12:00:00').getTime() : Date.now();
-  const t={ id:uid(), ts, direction:curDir, group, category, amount:Math.round(amt*100)/100, note };
+  const direction = curDir==='in'?'in':'out';
+  const amount = Math.round(amt*100)/100;
+  if(editingId){
+    const idx = S.tx.findIndex(x=>x.id===editingId);
+    if(idx>=0){
+      S.tx[idx] = { ...S.tx[idx], ts, direction, group, category, amount, note };
+      if(debtCat) S.tx[idx].debtCat = debtCat;  /* 保留负债子类字段 */
+    }
+    editingId = null;
+    refreshEditUI();
+    document.getElementById('amtInp').value='';
+    document.getElementById('noteInp').value='';
+    await safePersist();
+    toast('已修改');
+    renderDashboard(); renderTxList(); renderCalendar();
+    calSelected = dateOnly(ts); showCalDay(calSelected);
+    return;
+  }
+  const t={ id:uid(), ts, direction, group, category, amount, note };
+  if(debtCat) t.debtCat = debtCat;  /* 仅负债时挂 debtCat */
   S.tx.push(t);
   const mode=await safePersist();
   toast(mode==='online'?'已保存到云端':'已记下一笔');
   document.getElementById('amtInp').value='';
   document.getElementById('noteInp').value='';
-  document.getElementById('convertBox').style.display='none';
-  renderDashboard(); renderTxList();
+  renderDashboard(); renderTxList(); renderCalendar();
+  calSelected = dateOnly(ts); showCalDay(calSelected);
+}
+
+/* 载入一笔到表单，进入编辑模式 */
+function editTx(id){
+  const t = S.tx.find(x=>x.id===id);
+  if(!t){ toast('找不到这笔'); return; }
+  editingId = id;
+  // 切 dirSeg
+  curDir = t.direction==='in' ? 'in' : (t.group==='debt' ? 'debt' : 'out');
+  document.querySelectorAll('#dirSeg button').forEach(b=>b.classList.toggle('on', b.dataset.dir===curDir));
+  syncPickerArea();  // 会按 curDir 重置 pickedCat
+  // 恢复原分类（syncPickerArea 会重置，所以后再覆盖）
+  pickedCat = { c: t.category, g: t.group };
+  // v31 负债编辑：恢复负债子类（debtCat）和支出分类（pickedExpCat）
+  if(curDir==='debt'){
+    pickedCat = { c: t.debtCat || t.category, g: 'debt' };
+    pickedExpCat = t.category || '其他';
+    renderDebtExpChips();
+  }
+  highlightPicker();
+  document.getElementById('amtInp').value = t.amount;
+  document.getElementById('dateInp').value = dateOnly(t.ts);
+  document.getElementById('noteInp').value = t.note || '';
+  switchView('record');
+  refreshEditUI();
+  setTimeout(()=>document.getElementById('amtInp')?.focus(), 100);
+  toast('已载入这笔，改完点保存修改');
+}
+function cancelEdit(){
+  editingId = null;
+  refreshEditUI();
+  document.getElementById('amtInp').value='';
+  document.getElementById('noteInp').value='';
+  toast('已取消编辑');
+}
+function refreshEditUI(){
+  const btn = document.getElementById('saveBtn');
+  const cancel = document.getElementById('cancelEditBtn');
+  if(editingId){
+    btn.textContent = '保存修改';
+    if(cancel) cancel.style.display = '';
+  } else {
+    btn.textContent = '保存这笔';
+    if(cancel) cancel.style.display = 'none';
+  }
 }
 function confirmDelete(id){
   openModal('删除这笔记录？','删除后无法恢复，确定要删除吗？',async ()=>{
     S.tx=S.tx.filter(t=>t.id!==id);
+    if(editingId===id){ editingId=null; refreshEditUI(); }
     await safePersist();
-    renderDashboard(); renderTxList(); toast('已删除');
+    renderDashboard(); renderTxList(); renderCalendar(); toast('已删除');
+    if(calSelected) showCalDay(calSelected);
   });
 }
 
-/* =================== 真实时薪 =================== */
-function fillHourlyInputs(){
-  const s=S.settings;
-  document.getElementById('s_net').value=s.netMonthly;
-  document.getElementById('s_pay').value=s.payMonths;
-  document.getElementById('s_cost').value=s.workCostMonthly;
-  document.getElementById('s_present').value=s.presentHoursDay;
-  document.getElementById('s_commute').value=s.commuteHoursDay;
-  document.getElementById('s_days').value=s.workDaysMonth;
-  document.getElementById('s_ot').value=s.overtimeHoursMonth;
-  document.getElementById('s_save').value=s.currentSavings;
-  renderFormula();
-}
-function readHourlyInputs(){
-  return {
-    netMonthly:num('s_net'), payMonths:num('s_pay'), workCostMonthly:num('s_cost'),
-    presentHoursDay:num('s_present'), commuteHoursDay:num('s_commute'),
-    workDaysMonth:num('s_days'), overtimeHoursMonth:num('s_ot'), currentSavings:num('s_save'),
-    freedomGoal:S.settings.freedomGoal, safetyGoal:S.settings.safetyGoal, withdrawRate:S.settings.withdrawRate
-  };
-}
-function num(id){ return parseFloat(document.getElementById(id).value)||0; }
-function renderFormula(){
-  const s=readHourlyInputs();
-  const h=calcHourly(s);
-  const box=document.getElementById('formulaBox');
-  if(box) box.innerHTML=`
-    <div class="row"><span class="k">年实际到手 = 到手月薪 × 发薪月数</span><span class="v">${fmt0(h.annualTake)}</span></div>
-    <div class="row"><span class="k">年工作成本 = 工作成本/月 × 12</span><span class="v">${fmt0(h.annualCost)}</span></div>
-    <div class="row"><span class="k">年净到手 = 年实际到手 − 年工作成本</span><span class="v">${fmt0(h.annualNet)}</span></div>
-    <div class="row"><span class="k">每天耗时 = 在场时间 + 通勤</span><span class="v">${h.dailyHours.toFixed(1)} 小时</span></div>
-    <div class="row"><span class="k">年总耗时 = 每天耗时 × 月工作天数 × 12 + 加班/月 × 12</span><span class="v">${fmt0(h.annualHours)} 小时</span></div>
-    <div class="final">${fmt0(h.hourly)} / 小时<small>真实时薪 = 年净到手 ÷ 年总耗时</small></div>`;
-  document.getElementById('hourlyHeadline').textContent=fmt0(h.hourly)+' / 小时';
-}
-async function saveHourlyToSettings(){
-  // 把时薪相关参数同步回设置，供记账换算 & 首页使用
-  const s=readHourlyInputs();
-  S.settings.netMonthly=s.netMonthly; S.settings.payMonths=s.payMonths;
-  S.settings.workCostMonthly=s.workCostMonthly; S.settings.presentHoursDay=s.presentHoursDay;
-  S.settings.commuteHoursDay=s.commuteHoursDay; S.settings.workDaysMonth=s.workDaysMonth;
-  S.settings.overtimeHoursMonth=s.overtimeHoursMonth; S.settings.currentSavings=s.currentSavings;
-  const mode=await safePersist();
-  renderDashboard();
-  renderFundRings();
-  toast(mode==='online'?'参数已存到云端':'时薪参数已保存');
-}
-
-/* =================== 反推条（合并自情景模拟） =================== */
-// 把当前 settings 同步到反推条滑块位置（避免改上方输入后滑块和数值脱节）
-function syncSimSliders(){
-  const sc=document.getElementById('simCommute');
-  const so=document.getElementById('simOt');
-  if(sc) sc.value=S.settings.commuteHoursDay||0;
-  if(so) so.value=S.settings.overtimeHoursMonth||0;
-  runSim();
-}
-function runSim(){
-  const base=calcHourly(S.settings).hourly;
-  const c=parseFloat(document.getElementById('simCommute').value);
-  const o=parseFloat(document.getElementById('simOt').value);
-  const r=parseFloat(document.getElementById('simRaise').value);
-  document.getElementById('simCommuteVal').textContent=c.toFixed(1);
-  document.getElementById('simOtVal').textContent=o;
-  document.getElementById('simRaiseVal').textContent=r;
-  // 滑块 → 同步回上方输入框（不写 settings；用户主动滑块期间预览态）
-  document.getElementById('s_commute').value=c;
-  document.getElementById('s_ot').value=o;
-  const hc=calcHourly({...S.settings, commuteHoursDay:c}).hourly;
-  const ho=calcHourly({...S.settings, overtimeHoursMonth:o}).hourly;
-  const hr=calcHourly({...S.settings, netMonthly:S.settings.netMonthly*(1+r/100)}).hourly;
-  const best=Math.max(hc,ho,hr);
-  let tip;
-  if(best===hr) tip='涨薪对时薪的提升最明显——谈薪永远是最划算的事。';
-  else if(best===hc) tip='缩短通勤直接"赚"回时间，还没成本，优先考虑。';
-  else tip='减少无意义加班，把时间留给复利，比耗时长更有价值。';
-  const simRows = [
-    {label:'通勤 '+c.toFixed(1)+'h', v:hc},
-    {label:'加班 '+o+'h/月', v:ho},
-    {label:r===0?'不涨薪':('涨薪 +'+r+'%（月薪≈'+fmt0(S.settings.netMonthly*(1+r/100))+')'), v:hr}
-  ];
-  const cells = simRows.map(row=>{
-    const d=row.v-base;
-    const cls=d>=0?'delta-up':'delta-dn';
-    const sign=d>=0?'+':'';
-    return `<div class="sim-cell"><div class="lab">${row.label}</div><div class="val ${cls}">${fmt0(row.v)}/时<small>${sign}${d.toFixed(1)}</small></div></div>`;
-  }).join('');
-  document.getElementById('simCompare').innerHTML=`<div class="sim-compact"><div class="sim-compact-head">基准时薪 <b>${fmt0(base)}/时</b></div><div class="sim-compact-cells">${cells}</div><div class="sim-compact-tip muted">${tip}</div></div>`;
-}
-
 /* =================== 设置 =================== */
-function fillGoalInputs(){
-  document.getElementById('g_freedom').value=S.settings.freedomGoal;
-  document.getElementById('g_safety').value=S.settings.safetyGoal;
-  document.getElementById('g_rate').value=S.settings.withdrawRate;
-  document.getElementById('g_save').value=S.settings.currentSavings;
-}
-async function saveGoals(){
-  S.settings.freedomGoal=parseFloat(document.getElementById('g_freedom').value)||0;
-  S.settings.safetyGoal=parseFloat(document.getElementById('g_safety').value)||0;
-  S.settings.withdrawRate=parseFloat(document.getElementById('g_rate').value)||0;
-  S.settings.currentSavings=parseFloat(document.getElementById('g_save').value)||0;
-  const mode=await safePersist();
-  renderDashboard();
-  renderFundRings();
-  toast(mode==='online'?'目标已存到云端':'目标已保存');
-}
-
 /* =================== 数据导入导出 =================== */
 function exportJSON(){
   const data={ settings:S.settings, tx:S.tx, exportedAt:Date.now() };
@@ -1898,6 +1988,11 @@ async function boot(){
   // 无论成功失败，先把界面画出来（不白屏）
   renderAll();
   gistInit();
+  // v28：刷新后停留在上次打开的页面（默认仪表盘）
+  try{
+    const last = localStorage.getItem(SET_LAST_VIEW);
+    if(last && TITLES[last] && last!=='dashboard') switchView(last);
+  }catch(_){}
 }
 function renderAll(){
   paintIcons();
@@ -1906,9 +2001,6 @@ function renderAll(){
   document.getElementById('todayDate').textContent=dateOnly(Date.now())+' · 周日'.replace('周日',weekday());
   if(S.ready || S.error){
     renderDashboard(); renderTxList();
-    if(document.getElementById('view-hourly').classList.contains('active')){ fillHourlyInputs(); syncSimSliders(); }
-    if(document.getElementById('view-settings').classList.contains('active')) fillGoalInputs();
-    if(document.getElementById('view-simulate').classList.contains('active')) runSim();
   }
 }
 function weekday(){ const w=['周日','周一','周二','周三','周四','周五','周六']; return w[new Date().getDay()]; }
@@ -1920,30 +2012,22 @@ function bind(){
   // 记账
   document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#dirSeg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); curDir=b.dataset.dir; syncPickerArea(); updateConvert();
+    b.classList.add('on'); curDir=b.dataset.dir; syncPickerArea();
   });
-  document.getElementById('amtInp').oninput=updateConvert;
   document.getElementById('dateInp').value=dateOnly(Date.now());
   document.getElementById('saveBtn').onclick=saveTx;
-  // 时薪
-  ['s_net','s_pay','s_cost','s_present','s_commute','s_days','s_ot','s_save'].forEach(id=>{
-    document.getElementById(id).oninput=()=>{ renderFormula(); syncSimSliders(); };
-  });
-  document.getElementById('hourlyReset').onclick=()=>{ S.settings=clone(DEFAULT_SETTINGS); safePersist().then(()=>{fillHourlyInputs();renderDashboard();toast('已恢复示例值');}); };
-  document.getElementById('s_save').addEventListener('change',saveHourlyToSettings);
-  ['s_net','s_pay','s_cost','s_present','s_commute','s_days','s_ot'].forEach(id=>document.getElementById(id).addEventListener('change',saveHourlyToSettings));
-  // 模拟
-  ['simCommute','simOt','simRaise'].forEach(id=>document.getElementById(id).oninput=runSim);
+  document.getElementById('cancelEditBtn').onclick=cancelEdit;
+  // v30 删除方向筛选 chip 绑定
+  // 月历导航
+  const cp=document.getElementById('calPrev'), cn=document.getElementById('calNext'), ct=document.getElementById('calToday');
+  if(cp) cp.onclick=()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()-1,1); renderCalendar(); };
+  if(cn) cn.onclick=()=>{ calRef=new Date(calRef.getFullYear(),calRef.getMonth()+1,1); renderCalendar(); };
+  if(ct) ct.onclick=()=>{ calRef=new Date(); renderCalendar(); showCalDay(dateOnly(Date.now())); };
   // 设置
-  document.getElementById('saveGoals').onclick=saveGoals;
   document.getElementById('exportBtn').onclick=exportJSON;
   document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
   document.getElementById('importFile').onchange=(e)=>{ if(e.target.files[0]) importJSON(e.target.files[0]); };
   document.getElementById('clearBtn').onclick=clearAll;
-  // 收入组合来源：KFC 单价 + 导入收入表
-  document.getElementById('saveKfc').onclick=saveKfc;
-  document.getElementById('importXlsxBtn').onclick=()=>document.getElementById('xlsxFile').click();
-  document.getElementById('xlsxFile').onchange=(e)=>{ if(e.target.files[0]) importIncomeXlsx(); };
   // modal
   document.getElementById('mCancel').onclick=closeModal;
   document.getElementById('mOk').onclick=()=>{ const cb=modalCb; closeModal(); if(cb) cb(); };
@@ -2054,6 +2138,57 @@ if('serviceWorker' in navigator){
     }).catch(()=>{});
   });
 }
+
+/* 键盘弹起时隐藏底部 dock + 把被聚焦的输入框滚到可视区中央（修输入法遮挡金额输入框） */
+function focusIntoView(el){
+  if(!el) return;
+  // 平滑滚到可视区中央，等键盘完全弹起再二次校准
+  try{
+    el.scrollIntoView({block:'center', behavior:'smooth'});
+  }catch(_){ el.scrollIntoView(); }
+  setTimeout(()=>{
+    try{ el.scrollIntoView({block:'center', behavior:'smooth'}); }catch(_){}
+  }, 250);
+  setTimeout(()=>{
+    try{ el.scrollIntoView({block:'center', behavior:'smooth'}); }catch(_){}
+  }, 500);
+}
+if(window.visualViewport){
+  const dock=document.querySelector('.bottomtab');
+  const vvHandler=()=>{
+    const keyboardUp = window.innerHeight - window.visualViewport.height > 80;
+    if(dock) dock.style.display = keyboardUp ? 'none' : '';
+    document.querySelectorAll('.main').forEach(m=>m.style.paddingBottom = keyboardUp ? '20px' : '');
+    if(keyboardUp){
+      // 键盘弹起时：找当前聚焦的输入框，滚到可视区中央
+      const ae = document.activeElement;
+      if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')){
+        focusIntoView(ae);
+      }
+    }
+  };
+  window.visualViewport.addEventListener('resize', vvHandler);
+  window.visualViewport.addEventListener('scroll', vvHandler);
+}
+/* 任意 input/textarea/select 聚焦时主动滚到中央（兜底，照顾非 visualViewport 环境） */
+document.addEventListener('focusin',(e)=>{
+  const el=e.target;
+  if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT')){
+    focusIntoView(el);
+  }
+});
+/* 输入框容器额外留点顶部安全距离，避免聚焦时仍被键盘顶部工具栏遮挡 */
+document.addEventListener('focusin',(e)=>{
+  const el=e.target;
+  if(!el) return;
+  if(el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT'){
+    setTimeout(()=>{
+      const main=document.querySelector('.main');
+      if(!main) return;
+      main.scrollTop = Math.max(0, main.scrollTop - 8);
+    }, 320);
+  }
+});
 
 paintIcons();
 bind();

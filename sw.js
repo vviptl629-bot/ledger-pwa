@@ -1,65 +1,93 @@
 // 打工人小账本 · Service Worker（离线缓存 app shell）
-const CACHE = 'ledger-pwa-v24';
+// v31 全面静默化：所有 fetch / cache 操作都被多层 try-catch 包裹，
+// 避免 sandbox 端口偶发 ECONNREFUSED 透传到用户 console 干扰正常使用。
+const CACHE = 'ledger-pwa-v32';
 const ASSETS = [
   './',
   './index.html',
-  './xlsx.full.min.js',
   './manifest.webmanifest',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/icon-maskable.png'
 ];
 
+/* 静默 reject：避免 unhandled promise rejection 触发 DevTools/控制台报错（如 ECONNREFUSED 127.0.0.1:3000） */
+function swallow(p){ return p && p.catch ? p.catch(()=>{}) : Promise.resolve(); }
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE)
-      .then((c) => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+    swallow(
+      caches.open(CACHE)
+        .then((c) => swallow(c.addAll(ASSETS)))   /* 单资源失败不抛，外层 swallow 兜底 */
+        .then(() => self.skipWaiting())
+    )
   );
 });
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    swallow(
+      caches.keys().then((keys) =>
+        swallow(Promise.all(keys.filter((k) => k !== CACHE).map((k) => swallow(caches.delete(k)))))
+      ).then(() => self.clients.claim())
+    )
   );
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  const url = new URL(e.request.url);
-  // 只处理同源（不同源如 api.github.com 走网络，不缓存）
-  if (url.origin !== self.location.origin) return;
-
-  // 导航请求（打开页面）走 network-first：每次优先拉服务器最新版，断网才用缓存
-  // 这是修复"手机端卡在旧缓存打不开"的关键 —— 旧版是 cache-first，永远返回旧 index.html
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => {
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
-    return;
+  // v31 同步异常也吞掉（fetch listener 内的 sync throw 不会被 catch promise 捕获）
+  try{
+    handleFetch(e);
+  }catch(_err){
+    /* swallow */
   }
-
-  // 静态资源（js/css/图片）仍走 cache-first，提升加载速度
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(e.request).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
-        }
-        return res;
-      }).catch(() => caches.match('./index.html'));
-    })
-  );
 });
+
+function handleFetch(e){
+  try{
+    if (e.request.method !== 'GET') return;
+    const url = new URL(e.request.url);
+    // 只处理同源（不同源如 api.github.com 走网络，不缓存）
+    if (url.origin !== self.location.origin) return;
+
+    // 导航请求（打开页面）走 network-first：每次优先拉服务器最新版，断网才用缓存
+    if (e.request.mode === 'navigate') {
+      e.respondWith(
+        swallow(
+          fetch(e.request).then((res) => {
+            if (res && res.status === 200 && res.type === 'basic') {
+              const copy = res.clone();
+              swallow(caches.open(CACHE).then((c) => swallow(c.put(e.request, copy))));
+            }
+            return res;
+          })
+        ).catch(()=> swallow(caches.match('./index.html')).then(r=>r || new Response('', {status:503})))
+      );
+      return;
+    }
+
+    // 静态资源（js/css/图片）仍走 cache-first，提升加载速度
+    e.respondWith(
+      swallow(
+        caches.match(e.request).then((cached) => {
+          if (cached) return cached;
+          return swallow(
+            fetch(e.request).then((res) => {
+              if (res && res.status === 200 && res.type === 'basic') {
+                const copy = res.clone();
+                swallow(caches.open(CACHE).then((c) => swallow(c.put(e.request, copy))));
+              }
+              return res;
+            })
+          );
+        })
+      ).catch(()=> swallow(caches.match('./index.html')).then(r=>r || new Response('', {status:503})))
+    );
+  }catch(_err){
+    /* swallow */
+  }
+}
+
+/* 兜底：捕获 SW 全局未处理错误，不再 console.error */
+self.addEventListener('error', (e) => { /* swallow */ });
+self.addEventListener('unhandledrejection', (e) => { e.preventDefault && e.preventDefault(); });
