@@ -265,6 +265,11 @@
   /* ⚠️ 原 @media(max-width:480px){ .val:19px } 已删除：
      它位于后面的 @media(max-width:768px) 块之前，特异性相同，永远被 22px 覆盖，属死代码，
      留着会让人误以为小屏(≤480px)生效的是 19px。移动端尺寸统一由 768px 块管理。 */
+  /* v42：「本月支出 / 本月收入」可点开明细清单 */
+  .settle-grid-2x2 .settle-item.settle-tap{cursor:pointer; transition:.15s; -webkit-tap-highlight-color:transparent;}
+  .settle-grid-2x2 .settle-item.settle-tap:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm);}
+  .settle-grid-2x2 .settle-item.settle-tap:active{transform:scale(.98);}
+  .settle-grid-2x2 .settle-item.settle-tap:focus-visible{outline:2px solid var(--mint-deep); outline-offset:2px;}
 
   /* 旧横向紧凑版（仍保留类目，3 列与 4 列），新布局用 settle-grid-2x2 替代 */
   .settle-row{display:grid; grid-template-columns:1fr 1fr 1fr; align-items:stretch; gap:0; background:var(--cream2); border:1px solid var(--line2); border-radius:14px; padding:6px;}
@@ -590,6 +595,62 @@
     #incomeMix > div > div:last-child > div{font-size:11px !important; padding:0 !important; gap:4px !important;}
     #expenseMix > div > div:last-child{display:grid !important; grid-template-columns:1fr 1fr !important; gap:1px 4px !important; min-width:0 !important; width:100% !important;}
     #expenseMix > div > div:last-child > div{font-size:10.5px !important; padding:0 !important; gap:3px !important;}
+
+  /* v42 月度结算明细（全屏清单层） */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:200; background:var(--cream);
+    display:flex; flex-direction:column; overflow:hidden;
+    padding-top:env(safe-area-inset-top);
+  }
+  .sheet-head{
+    display:flex; align-items:center; gap:8px; flex:0 0 auto;
+    padding:10px 12px; border-bottom:1px solid var(--line2); background:#FFFCF6;
+  }
+  .sheet-back{
+    border:1px solid var(--line); background:var(--cream2); color:var(--ink);
+    border-radius:10px; padding:7px 13px; font-size:14px; font-weight:700; cursor:pointer;
+    font-family:inherit;
+  }
+  .sheet-back:active{transform:scale(.97)}
+  .sheet-title{font-weight:800; font-size:16px; flex:1; text-align:center; color:var(--ink);}
+  .sheet-spacer{width:64px; flex:0 0 64px;}   /* 让标题真正居中 */
+  .sheet-seg{display:flex; gap:8px; padding:10px 12px; flex:0 0 auto;}
+  .sheet-seg button{
+    flex:1; padding:9px 4px; border-radius:11px; border:1px solid var(--line);
+    background:var(--cream2); font-weight:700; font-size:14px; color:var(--ink-soft);
+    cursor:pointer; font-family:inherit;
+  }
+  .sheet-seg button.on{background:var(--mint-deep); color:#fff; border-color:var(--mint-deep);}
+  .sheet-body{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:2px 12px 28px;}
+  .sd-row{
+    display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:8px;
+    background:var(--cream2); border:1px solid var(--line2); border-radius:12px;
+  }
+  .sd-date{
+    flex:0 0 52px; font-size:12.5px; font-weight:700; color:var(--ink-soft);
+    font-variant-numeric:tabular-nums; line-height:1.3;
+  }
+  .sd-date small{display:block; font-size:10.5px; font-weight:600; opacity:.75;}
+  .sd-main{flex:1; min-width:0;}
+  .sd-cat{font-size:14.5px; font-weight:700; color:var(--ink);}
+  .sd-note{
+    font-size:12px; color:var(--ink-soft); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .sd-amt{
+    flex:0 0 auto; font-size:15.5px; font-weight:800; font-variant-numeric:tabular-nums;
+  }
+  .sd-amt.out{color:var(--expense)} .sd-amt.in{color:var(--income)}
+  .sd-empty{
+    text-align:center; padding:56px 20px; color:var(--ink-soft); font-size:14px; line-height:1.7;
+  }
+  .sd-sum{
+    padding:10px 12px; margin-bottom:10px; border-radius:12px; background:#EAF7F0;
+    border:1px solid var(--mint); font-size:13.5px; font-weight:700; color:var(--mint-deep);
+    display:flex; justify-content:space-between;
+  }
+  .sd-sum b{font-variant-numeric:tabular-nums;}
+
  .bottomtab{
       display:flex; position:fixed; bottom:0; left:0; right:0; z-index:50;
       background:#FFFCF6; backdrop-filter:blur(8px);
@@ -741,7 +802,7 @@
           <div id="pickerIn" style="display:none"><div id="incomeChips"></div></div>
           <div id="pickerDebt" style="display:none">
             <div id="debtChips"></div>
-            <!-- v31 负债二级选择：这笔计入哪个支出分类（房贷→居住 等），用户可改 -->
+            <!-- v31 负债二级选择：这笔计入哪个支出分类（房贷→生活 等），用户可改 -->
             <div id="debtExpWrap" style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line2)">
               <div class="muted" style="font-size:11.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; margin-bottom:8px">这笔计入哪个支出分类</div>
               <div id="debtExpChips"></div>
@@ -833,6 +894,21 @@
   </main>
 </div>
 
+<!-- v42 月度结算明细：点「本月支出 / 本月收入」打开，按日期倒序列出该类型全部流水 -->
+<div class="sheet-overlay" id="settleSheet" style="display:none" aria-hidden="true">
+  <div class="sheet-head">
+    <button class="sheet-back" id="settleBack" type="button">‹ 返回</button>
+    <div class="sheet-title" id="settleTitle">本月支出明细</div>
+    <span class="sheet-spacer"></span>
+  </div>
+  <div class="sheet-seg" id="settleSeg">
+    <button type="button" data-type="out" class="on">支出</button>
+    <button type="button" data-type="in">收入</button>
+    <button type="button" data-type="debt">负债</button>
+  </div>
+  <div class="sheet-body" id="settleBody"></div>
+</div>
+
 <!-- 底部Tab -->
 <nav class="bottomtab">
   <div class="bt active" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
@@ -917,27 +993,27 @@ const DEFAULT_SETTINGS = {
 const CATS = {
   in:['KFC兼职','认证服务费','外卖','其他收入'],
   out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],
-  out_elastic:['餐饮','交通','购物','娱乐','居住','医疗','学习','其他']
+  out_elastic:['餐饮','交通','购物','娱乐','生活','医疗','学习','其他']
 };
 const DEBT_CATS = ['房贷','花呗/信用卡','借呗/网贷','亲友借款','其他负债'];
 const DEBT_COL = '#D98E4A'; /* 负债：琥珀色，与支出(红)/收入(绿)明显区分 */
 
 /* v31 负债子类 → 支出分类 默认映射（用户仍可在二级 chip 里手动改）：
-   房贷         → 居住（每月固定房贷本质是居住支出）
+   房贷         → 生活（每月固定房贷本质是生活支出）
    花呗/信用卡  → 购物（消费用途最常见，可改）
    借呗/网贷    → 其他（资金周转，难以绑定单一类目）
    亲友借款     → 其他
    其他负债     → 其他
    用户选的支出分类会写入 tx.category（用于月度结余/分类占比），负债子类写入 tx.debtCat（仅用于负债维度）。 */
 const DEBT_TO_EXP_DEFAULT = {
-  '房贷':'居住',
+  '房贷':'生活',
   '花呗/信用卡':'购物',
   '借呗/网贷':'其他',
   '亲友借款':'其他',
   '其他负债':'其他'
 };
 const EXP_FOR_DEBT = CATS.out_elastic; /* 负债二级 chip：8 个支出分类 */
-let pickedExpCat = '居住';  /* 负债模式下当前选中的支出分类（用户可改），切回支出/收入时清空 */
+let pickedExpCat = '生活';  /* 负债模式下当前选中的支出分类（用户可改），切回支出/收入时清空 */
 
 let S = { settings:null, tx:[], error:null, ready:false };
 
@@ -947,7 +1023,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v41';
+const APP_VERSION='v42';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -1155,6 +1231,21 @@ function isSeedTx(t){
   });
 }
 function stripSeed(tx){ return (tx||[]).filter(function(t){ return !isSeedTx(t); }); }
+
+/* v42：分类重命名迁移表。键=旧分类名，值=新分类名。
+   以后再改名只需往这里加一条，历史流水会在启动时自动迁移，
+   保证「录入选项 / 筛选 / 统计图表 / 历史记录」四处名称永远一致，不留遗留。 */
+const CAT_RENAME = { '居住':'生活' };
+function migrateCategoryRename(){
+  var n=0;
+  (S.tx||[]).forEach(function(t){
+    if(t && t.category && CAT_RENAME[t.category]){
+      t.category = CAT_RENAME[t.category]; n++;
+    }
+  });
+  if(n){ try{ localStorage.setItem(KEY_TX, JSON.stringify(S.tx)); }catch(_){} }
+  return n;
+}
 
 function seedData(){
   const s = clone(DEFAULT_SETTINGS);
@@ -1453,15 +1544,15 @@ function renderMonthlySettlement(){
   // 第一排：收入 / 支出（白底小卡）；第二排：结余 / 年度结余（薄荷绿/淡红强调卡）
   box.innerHTML = `
     <div class="settle-grid-2x2">
-      <div class="settle-item">
-        <div class="lab">本月支出</div>
+      <div class="settle-item settle-tap" data-settle="out" role="button" tabindex="0">
+        <div class="lab">本月支出 ›</div>
         <div class="val out">${fmt2(out)}</div>
-        <div class="sub">${outN} 笔</div>
+        <div class="sub">${outN} 笔 · 点看明细</div>
       </div>
-      <div class="settle-item">
-        <div class="lab">本月收入</div>
+      <div class="settle-item settle-tap" data-settle="in" role="button" tabindex="0">
+        <div class="lab">本月收入 ›</div>
         <div class="val in">${fmt2(inc)}</div>
-        <div class="sub">${incN} 笔</div>
+        <div class="sub">${incN} 笔 · 点看明细</div>
       </div>
       <div class="settle-item ${bal>=0?'mint-final':''}">
         <div class="lab">${VIEW_MONTH==='全部'?'累计结余':'本月结余'}</div>
@@ -1474,6 +1565,79 @@ function renderMonthlySettlement(){
         <div class="sub">${yrBal>=0?'本年攒下了':'本年超支'} · ${yrN} 笔</div>
       </div>
     </div>`;
+  /* v42：绑定「本月支出 / 本月收入」点击 → 打开明细清单 */
+  box.querySelectorAll('.settle-tap[data-settle]').forEach(function(el){
+    el.onclick = function(){ openSettleDetail(el.dataset.settle); };
+    el.onkeydown = function(e){
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); openSettleDetail(el.dataset.settle); }
+    };
+  });
+}
+
+/* =================== v42 月度结算明细清单 =================== */
+var SETTLE_DETAIL_TYPE = 'out';
+function openSettleDetail(type){
+  SETTLE_DETAIL_TYPE = (type==='in'||type==='debt') ? type : 'out';
+  var sheet=document.getElementById('settleSheet');
+  if(!sheet) return;
+  sheet.style.display='flex';
+  sheet.setAttribute('aria-hidden','false');
+  document.body.style.overflow='hidden';   /* 防止背景滚动 */
+  renderSettleDetail();
+}
+function closeSettleDetail(){
+  var sheet=document.getElementById('settleSheet');
+  if(!sheet) return;
+  sheet.style.display='none';
+  sheet.setAttribute('aria-hidden','true');
+  document.body.style.overflow='';
+}
+function renderSettleDetail(){
+  var body=document.getElementById('settleBody');
+  var title=document.getElementById('settleTitle');
+  if(!body) return;
+  var seg=document.getElementById('settleSeg');
+  if(seg) seg.querySelectorAll('button').forEach(function(b){
+    b.classList.toggle('on', b.dataset.type===SETTLE_DETAIL_TYPE);
+  });
+
+  var label = SETTLE_DETAIL_TYPE==='in' ? '本月收入' : (SETTLE_DETAIL_TYPE==='debt' ? '本月负债' : '本月支出');
+  var scope = VIEW_MONTH==='全部' ? '全部' : (VIEW_MONTH===monthKey(Date.now()) ? '本月' : VIEW_MONTH.split('-')[1]+'月');
+  if(title) title.textContent = scope + label + '明细';
+
+  /* 先按月份范围筛，再按类型筛 */
+  var list = (S.tx||[]).filter(function(t){
+    if(!t || !t.ts) return false;
+    if(VIEW_MONTH!=='全部' && monthKey(t.ts)!==VIEW_MONTH) return false;
+    if(SETTLE_DETAIL_TYPE==='debt') return t.group==='debt';
+    return t.direction===SETTLE_DETAIL_TYPE && t.group!=='debt';
+  }).sort(function(a,b){ return b.ts - a.ts; });   /* 日期倒序 */
+
+  if(!list.length){
+    body.innerHTML = '<div class="sd-empty">这个月还没有' +
+      (SETTLE_DETAIL_TYPE==='in'?'收入':(SETTLE_DETAIL_TYPE==='debt'?'负债':'支出')) +
+      '记录～<br>去「记账」记一笔试试。</div>';
+    return;
+  }
+
+  var sum = list.reduce(function(a,t){ return a + (Number(t.amount)||0); }, 0);
+  var html = '<div class="sd-sum"><span>共 ' + list.length + ' 笔</span><b>' + fmt2(sum) + '</b></div>';
+  html += list.map(function(t){
+    var d=new Date(t.ts);
+    var md=(d.getMonth()+1)+'/'+d.getDate();
+    var wd=['日','一','二','三','四','五','六'][d.getDay()];
+    var amtCls = t.direction==='in' ? 'in' : 'out';
+    var cat = escapeHtml(t.category || '其他');
+    if(t.group==='debt' && t.debtCat) cat += ' · ' + escapeHtml(t.debtCat);
+    var note = escapeHtml(t.note || '');
+    return '<div class="sd-row">' +
+      '<div class="sd-date">' + md + '<small>周' + wd + '</small></div>' +
+      '<div class="sd-main"><div class="sd-cat">' + cat + '</div>' +
+      (note ? '<div class="sd-note">' + note + '</div>' : '') + '</div>' +
+      '<div class="sd-amt ' + amtCls + '">' + fmt2(t.amount) + '</div>' +
+      '</div>';
+  }).join('');
+  body.innerHTML = html;
 }
 
 /* v29 旧的紧凑"年度结余"独立卡已删，年度结余合并进月度结算 4 列卡 */
@@ -1484,7 +1648,7 @@ const EXP_CAT = {
   '交通':{icon:'car',col:'#7FC8A9'},
   '购物':{icon:'bag',col:'#E8A87C'},
   '娱乐':{icon:'game',col:'#C9B8E0'},
-  '居住':{icon:'house',col:'#56B98C'},
+  '生活':{icon:'house',col:'#56B98C'},
   '医疗':{icon:'pill',col:'#F7A8A8'},
   '学习':{icon:'book',col:'#9FD8CB'},
   '其他':{icon:'tag',col:'#EAE0CF'},
@@ -1495,7 +1659,7 @@ const EXP_CAT = {
   '保险':{icon:'tag',col:'#EAE0CF'},
   '订阅':{icon:'tag',col:'#EAE0CF'},
 };
-const EXP_CAT_ORDER = ['餐饮','交通','购物','娱乐','居住','医疗','学习','其他'];
+const EXP_CAT_ORDER = ['餐饮','交通','购物','娱乐','生活','医疗','学习','其他'];
 
 /* 计算支出分类汇总 */
 function expenseTotalsByMonth(month){
@@ -1641,7 +1805,7 @@ function renderExpenseGrid(){
     {name:'交通',icon:'car',col:'#7FC8A9'},
     {name:'购物',icon:'bag',col:'#E8A87C'},
     {name:'娱乐',icon:'game',col:'#C9B8E0'},
-    {name:'居住',icon:'house',col:'#56B98C'},
+    {name:'生活',icon:'house',col:'#56B98C'},
     {name:'医疗',icon:'pill',col:'#F7A8A8'},
     {name:'学习',icon:'book',col:'#9FD8CB'},
     {name:'其他',icon:'tag',col:'#EAE0CF'},
@@ -1971,7 +2135,7 @@ async function saveTx(){
   if(curDir==='in'){ category=pickedCat.c; group='income'; }
   else if(curDir==='debt'){
     debtCat = pickedCat.c;            /* 负债子类（如「房贷」） */
-    category = pickedExpCat;          /* 计入哪个支出分类（如「居住」） */
+    category = pickedExpCat;          /* 计入哪个支出分类（如「生活」） */
     group = 'debt';
   }
   else { category=pickedCat.c; group=pickedCat.g; }
@@ -2155,6 +2319,10 @@ async function boot(){
     const d=await Store.loadAll();
     S.settings=d.settings; S.tx=d.tx; S.error=null; S.ready=true;
     syncUi=null;
+    /* v42：历史流水的旧分类名迁移（如「居住」→「生活」），有变更则回写并推云端，
+       保证另一端也完成迁移，统计/筛选/历史不留旧名。 */
+    const renamed = migrateCategoryRename();
+    if(renamed){ try{ Store.persist(); }catch(_){} }
     /* v38：已启用云端同步 → 示例数据一律清除。它不是用户输入，留着会持续污染两端。 */
     if(gist.enabled && gist.token){
       const n0=S.tx.length;
@@ -2186,6 +2354,17 @@ async function boot(){
     const last = localStorage.getItem(SET_LAST_VIEW);
     if(last && TITLES[last] && last!=='dashboard') switchView(last);
   }catch(_){}
+  // v42：月度结算明细层 —— 返回按钮 + 类型切换（支出/收入/负债）
+  var _sBack=document.getElementById('settleBack');
+  if(_sBack) _sBack.onclick = closeSettleDetail;
+  var _sSeg=document.getElementById('settleSeg');
+  if(_sSeg) _sSeg.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){ SETTLE_DETAIL_TYPE = b.dataset.type; renderSettleDetail(); };
+  });
+  // Esc 关闭（桌面端便利）
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') closeSettleDetail();
+  });
 }
 function renderCloudWarn(){
   var el=document.getElementById('cloudWarn'); if(!el) return;
