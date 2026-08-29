@@ -694,10 +694,10 @@
         <div class="sub">每一笔，都是自由的积累</div>
       </div>
     </div>
-    <div class="nav-item active" data-view="dashboard">
+    <div class="nav-item" data-view="dashboard">
       <span id="icHome"></span> 仪表盘
     </div>
-    <div class="nav-item" data-view="record">
+    <div class="nav-item active" data-view="record">
       <span id="icPen"></span> 10秒记账
     </div>
     <div class="nav-item" data-view="calendar">
@@ -716,7 +716,7 @@
   <!-- 主区 -->
   <main class="main">
     <div class="topbar">
-      <h1 id="pageTitle">仪表盘</h1>
+      <h1 id="pageTitle">10秒记账</h1>
       <span class="sync ok" id="syncBox">
         <span class="dot"></span><span id="syncText">—</span>
         <button id="syncRetry" style="display:none">重试</button>
@@ -734,7 +734,7 @@
     <div id="errZone"></div>
 
     <!-- 仪表盘 -->
-    <section class="view active" id="view-dashboard">
+    <section class="view" id="view-dashboard">
       <div id="cloudWarn" class="cloud-warn" style="display:none">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <div class="cw-txt"><b>数据未开启云端同步</b><br>当前仅保存在本设备浏览器，换手机 / 清缓存会丢失。打开右下「设置 → 云端同步」填入 GitHub Token 即可自动备份每一笔。</div>
@@ -781,7 +781,7 @@
     </section>
 
     <!-- 记账 -->
-    <section class="view" id="view-record">
+    <section class="view active" id="view-record">
       <div class="card">
         <div class="tape"></div>
         <h2><span id="icPen"></span> 10 秒记一笔</h2>
@@ -912,8 +912,8 @@
 
 <!-- 底部Tab -->
 <nav class="bottomtab">
-  <div class="bt active" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
-  <div class="bt" data-view="record"><span id="icPen2"></span>记账</div>
+  <div class="bt" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
+  <div class="bt active" data-view="record"><span id="icPen2"></span>记账</div>
   <div class="bt" data-view="calendar"><span id="icCal2"></span>日历</div>
   <div class="bt" data-view="settings"><span id="icGear2"></span>设置</div>
 </nav>
@@ -1024,7 +1024,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v43';
+const APP_VERSION='v44';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -2350,10 +2350,10 @@ async function boot(){
   var _flush=function(){ if(gist.enabled && gist.token){ clearTimeout(gist._t); pushGist(); } };
   document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') _flush(); });
   window.addEventListener('pagehide', _flush);
-  // v28：刷新后停留在上次打开的页面（默认仪表盘）
+  // v28：刷新后停留在上次打开的页面（默认改为「记账」record；若用户曾切换到其他页则尊重其上次停留页）
   try{
     const last = localStorage.getItem(SET_LAST_VIEW);
-    if(last && TITLES[last] && last!=='dashboard') switchView(last);
+    if(last && TITLES[last]) switchView(last);
   }catch(_){}
   // v42：月度结算明细层 —— 返回按钮 + 类型切换（支出/收入/负债）
   var _sBack=document.getElementById('settleBack');
