@@ -745,16 +745,7 @@
         <div id="todoList"><div class="skeleton">加载中…</div></div>
       </div>
 
-      <!-- v32 仪表盘重排：把"收入组合"和"支出分类占比"合并成"收支双圈"卡片（移动端左右两列），关键 4 卡一屏可见 -->
-      <div class="card" id="mixCard">
-        <h2><span id="icMix"></span> 收支分类占比</h2>
-        <div class="mix-row">
-          <div id="incomeMix"></div>
-          <div id="expenseMix"></div>
-        </div>
-      </div>
-
-      <!-- 月度结算条（含月份切换 + 2×2 数据） -->
+      <!-- 月度结算条（含月份切换 + 2×2 数据）— v43 与「收支分类占比」位置对调，放到其上方 -->
       <div class="card month-card" id="monthCard">
         <div class="tape"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
@@ -764,6 +755,16 @@
           </div>
         </div>
         <div id="monthSettlement" style="margin-top:12px"></div>
+      </div>
+
+      <!-- v32 仪表盘重排：把"收入组合"和"支出分类占比"合并成"收支双圈"卡片（移动端左右两列），关键 4 卡一屏可见 -->
+      <div class="card" id="mixCard">
+        <div class="tape"></div>
+        <h2><span id="icMix"></span> 收支分类占比</h2>
+        <div class="mix-row">
+          <div id="incomeMix"></div>
+          <div id="expenseMix"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -1023,7 +1024,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v42';
+const APP_VERSION='v43';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
