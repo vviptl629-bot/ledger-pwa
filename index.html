@@ -1029,7 +1029,7 @@ async function pushGist(){
     }
     showGistInfo();
     syncStatus('已同步 '+new Date().toLocaleTimeString(),'ok');
-    gist._lastOk=Date.now();
+    gist._lastOk=Date.now();gist._lp=Date.now();
     if(gist._retry){ clearInterval(gist._retry); gist._retry=null; }
   }catch(e){
     if(/40[13]/.test(e&&e.message||'')){ if(gist._retry){clearInterval(gist._retry);gist._retry=null;} syncStatus('⚠️ '+(e.message||'同步失败')+'（请更新 Token）','err'); return; }
@@ -1042,7 +1042,7 @@ function showGistInfo(){
   var el=document.getElementById('syncGistInfo'); if(!el)return;
   el.innerHTML=gist.gistId?('已绑定私有 Gist：<a href="https://gist.github.com/'+gist.gistId+'" target="_blank" rel="noopener">'+gist.gistId+'</a><br>两台设备用<b>相同 Token + 此 ID</b> 即共享同一份数据。'):'';
 }
-function schedulePush(){ if(!gist.enabled||!gist.token)return; clearTimeout(gist._t); gist._t=setTimeout(pushGist,800); }
+function schedulePush(){ if(!gist.enabled||!gist.token)return; clearTimeout(gist._t); gist._t=setTimeout(pushGist,Math.max(800,(gist._lp||0)+60000-Date.now())); }
 function mergeById(local,incoming,key){
   key=key||'id'; var map={};
   (local||[]).forEach(function(x){ if(x&&x[key]!=null)map[x[key]]=x; });
