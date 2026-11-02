@@ -1037,12 +1037,12 @@ async function pushGist(){
     startGistRetry();
   }
 }
-function startGistRetry(){ if(gist._retry)return; gist._retry=setInterval(function(){ if(!gist.enabled||!gist.token){clearInterval(gist._retry);gist._retry=null;return;} pushGist(); },120000); }
+function startGistRetry(){ if(gist._retry)return; gist._retry=setInterval(function(){ if(!gist.enabled||!gist.token){clearInterval(gist._retry);gist._retry=null;return;} pushGist(); },600000); }
 function showGistInfo(){
   var el=document.getElementById('syncGistInfo'); if(!el)return;
   el.innerHTML=gist.gistId?('已绑定私有 Gist：<a href="https://gist.github.com/'+gist.gistId+'" target="_blank" rel="noopener">'+gist.gistId+'</a><br>两台设备用<b>相同 Token + 此 ID</b> 即共享同一份数据。'):'';
 }
-function schedulePush(){ if(!gist.enabled||!gist.token)return; clearTimeout(gist._t); gist._t=setTimeout(pushGist,Math.max(800,(gist._lp||0)+60000-Date.now())); }
+function schedulePush(){ if(!gist.enabled||!gist.token)return; clearTimeout(gist._t); gist._t=setTimeout(pushGist,Math.max(3000,(gist._lp||0)+3600000-Date.now())); }
 function mergeById(local,incoming,key){
   key=key||'id'; var map={};
   (local||[]).forEach(function(x){ if(x&&x[key]!=null)map[x[key]]=x; });
@@ -1108,7 +1108,7 @@ async function checkConsistency(){
   }catch(e){ setSync('err','检查失败'); syncStatus('检查失败：'+(e&&e.message?e.message:e),'err'); toast('检查失败：'+e.message); }
 }
 var _autoPull=null;
-function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },300000); }
+function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },3600000); }
 function gistEnable(){
   var tok=document.getElementById('syncToken').value.trim();
   var gid=document.getElementById('syncGistId').value.trim();
@@ -2225,7 +2225,7 @@ async function boot(){
   renderAll();
   gistInit();
   // 关闭 / 切后台时强制 flush 待推送数据，避免 800ms 防抖窗口内关页导致丢失
-  var _flush=function(){ if(gist.enabled && gist.token){ clearTimeout(gist._t); pushGist(); } };
+  var _flush=function(){ if(gist.enabled && gist.token && gist._t){ clearTimeout(gist._t); gist._t=null; pushGist(); } };
   document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') _flush(); });
   window.addEventListener('pagehide', _flush);
   // v28：刷新后停留在上次打开的页面（默认改为「记账」record；若用户曾切换到其他页则尊重其上次停留页）
