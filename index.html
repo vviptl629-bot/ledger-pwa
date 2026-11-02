@@ -1045,7 +1045,7 @@ async function pushGist(){
     startGistRetry();
   }
 }
-function startGistRetry(){ if(gist._retry)return; gist._retry=setInterval(function(){ if(!gist.enabled||!gist.token){clearInterval(gist._retry);gist._retry=null;return;} pushGist(); },6000); }
+function startGistRetry(){ if(gist._retry)return; gist._retry=setInterval(function(){ if(!gist.enabled||!gist.token){clearInterval(gist._retry);gist._retry=null;return;} pushGist(); },120000); }
 function showGistInfo(){
   var el=document.getElementById('syncGistInfo'); if(!el)return;
   el.innerHTML=gist.gistId?('已绑定私有 Gist：<a href="https://gist.github.com/'+gist.gistId+'" target="_blank" rel="noopener">'+gist.gistId+'</a><br>两台设备用<b>相同 Token + 此 ID</b> 即共享同一份数据。'):'';
@@ -1116,7 +1116,7 @@ async function checkConsistency(){
   }catch(e){ setSync('err','检查失败'); syncStatus('检查失败：'+(e&&e.message?e.message:e),'err'); toast('检查失败：'+e.message); }
 }
 var _autoPull=null;
-function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },45000); }
+function startAutoPull(){ if(_autoPull)return; _autoPull=setInterval(function(){ if(typeof navigator!=='undefined'&&navigator.onLine===false)return; pullGist(true); },300000); }
 function gistEnable(){
   var tok=document.getElementById('syncToken').value.trim();
   var gid=document.getElementById('syncGistId').value.trim();
