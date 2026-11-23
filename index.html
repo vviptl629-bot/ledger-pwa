@@ -253,6 +253,22 @@
   .settle-grid-2x2 .settle-item.settle-tap:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm);}
   .settle-grid-2x2 .settle-item.settle-tap:active{transform:scale(.98);}
   .settle-grid-2x2 .settle-item.settle-tap:focus-visible{outline:2px solid var(--mint-deep); outline-offset:2px;}
+  /* 三分法改造：账目清晰看板 + 外事办往来色 */
+  .clarity-card h2{display:flex;align-items:center;gap:8px}
+  .clarity-badge{font-size:11px;font-weight:700;color:var(--mint-deep);border:1px solid var(--mint);border-radius:999px;padding:2px 9px;background:#EAF7F0}
+  .clarity-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:6px 2px}
+  .clarity-item{border:1px solid var(--line2);border-radius:14px;padding:13px 12px;min-width:0;background:var(--cream2)}
+  .clarity-item.life b{color:var(--mint-deep)}
+  .clarity-item.fixed b{color:#5F5E5A}
+  .clarity-item.work b{color:#B46A18}
+  .clarity-item .clab{font-size:11.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clarity-item .cval{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clarity-item .csub{font-size:11px;color:var(--ink-soft);margin-top:4px;line-height:1.4}
+  .clarity-note{font-size:11.5px;color:var(--ink-soft);padding:2px 2px 0;line-height:1.5}
+  .work-final{background:#FFF6E8!important;border-color:#E8C88F!important}
+  .work-final .lab{color:#B46A18!important}
+  #dirSeg button[data-dir="work"].on{background:#B46A18;color:#fff}
+  .tx-tag-work{display:inline-block;font-size:10px;font-weight:800;color:#B46A18;border:1px solid #E8C88F;border-radius:6px;padding:0 4px;margin-right:4px;vertical-align:1px}
 
   
   
@@ -694,6 +710,13 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <div class="cw-txt"><b>数据未开启云端同步</b><br>当前仅保存在本设备浏览器，换手机 / 清缓存会丢失。打开右下「设置 → 云端同步」填入 GitHub Token 即可自动备份每一笔。</div>
       </div>
+      <!-- 三分法改造：侧边栏首屏的清晰展示区 -->
+      <div class="card clarity-card" id="clarityCard">
+        <div class="tape"></div>
+        <h2>账目清晰看板 <span class="clarity-badge">三分法</span></h2>
+        <div id="clarityBoard"></div>
+      </div>
+
       <div class="card tilt">
         <div class="tape"></div>
         <h2><span id="icBell"></span> 今天要处理</h2>
@@ -744,6 +767,7 @@
           <button data-dir="out" class="on out">支出</button>
           <button data-dir="in" class="in">收入</button>
           <button data-dir="debt" class="debt">负债</button>
+          <button data-dir="work" class="work">外事办</button>
         </div>
         <div style="height:14px"></div>
 
@@ -764,6 +788,8 @@
               <div id="debtExpChips"></div>
             </div>
           </div>
+          <!-- 三分法改造：外事办往来（垫付待收 / 回款冲账） -->
+          <div id="pickerWork" style="display:none"><div id="workChips"></div></div>
         </div>
 
         <div style="height:10px"></div>
@@ -861,6 +887,7 @@
     <button type="button" data-type="out" class="on">支出</button>
     <button type="button" data-type="in">收入</button>
     <button type="button" data-type="debt">负债</button>
+    <button type="button" data-type="work">往来</button>
   </div>
   <div class="sheet-body" id="settleBody"></div>
 </div>
@@ -931,10 +958,68 @@ const DEFAULT_SETTINGS = {
   kfcRateNormal:22, kfcRateHoliday:48
 };
 const CATS = {
-  in:['KFC兼职','认证服务费','外卖','其他收入'],
+  in:['KFC兼职','外卖','其他收入'],
+  work:['垫付待收','回款冲账'],
   out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],
   out_elastic:['餐饮','交通','购物','娱乐','生活','医疗','学习','其他']
 };
+/* 三分法改造：旧数据里「认证服务费」= 外事办回款，统计时按往来款隔离 */
+const LEGACY_WORK_CAT = '认证服务费';
+function isWorkTx(t){
+  if(!t) return false;
+  return t.bucket==='work' || t.group==='work' || t.category===LEGACY_WORK_CAT || t.category==='回款冲账' || t.category==='垫付待收';
+}
+/* 房贷负债只作余额快照，不参与月度收支统计 */
+function isHousingDebtSnapshot(t){
+  return !!(t && t.group==='debt' && t.debtCat==='房贷');
+}
+/* 一笔流水是否计入生活账统计（排除往来款与房贷快照） */
+function isCoreTx(t){
+  return !!t && !isWorkTx(t) && !isHousingDebtSnapshot(t);
+}
+
+/* 三分法改造：外事办往来 FIFO 核销
+   规则：回款按时间顺序先冲最早未结清的垫付；冲不完的差额 = 真实收入；
+   仍未冲掉的垫付 = 未收余额。跨月自动承接，不需要备注手工配对。 */
+function computeWorkLedger(){
+  const list = (S.tx||[]).filter(isWorkTx).slice().sort((a,b)=>a.ts-b.ts);
+  const byMonth = {};
+  let outstanding = 0, totalIncome = 0;
+  list.forEach(function(t){
+    const mk = monthKey(t.ts);
+    const m = byMonth[mk] || (byMonth[mk]={out:0,in:0,netIncome:0,outstanding:0,count:0});
+    const v = Number(t.amount)||0;
+    m.count++;
+    if(t.direction==='in'){
+      m.in += v;
+      if(v <= outstanding){
+        outstanding -= v;
+      }else{
+        const extra = v - outstanding;
+        outstanding = 0;
+        m.netIncome += extra;
+        totalIncome += extra;
+      }
+    }else{
+      m.out += v;
+      outstanding += v;
+    }
+    m.outstanding = outstanding;  /* 该月最后一笔之后的累计未收 */
+  });
+  return {byMonth:byMonth, outstanding:outstanding, totalIncome:totalIncome, list:list};
+}
+function workNetAt(month){
+  const L = computeWorkLedger();
+  if(!month || month==='全部') return L.totalIncome;
+  return (L.byMonth[month] && L.byMonth[month].netIncome) || 0;
+}
+function workDueAt(month){
+  const L = computeWorkLedger();
+  if(!month || month==='全部') return L.outstanding;
+  const keys = Object.keys(L.byMonth).filter(function(k){return k<=month;}).sort();
+  if(!keys.length) return 0;
+  return L.byMonth[keys[keys.length-1]].outstanding;
+}
 const DEBT_CATS = ['房贷','花呗/信用卡','借呗/网贷','亲友借款','其他负债'];
 const DEBT_COL = '#D98E4A'; /* 负债：琥珀色，与支出(红)/收入(绿)明显区分 */
 
@@ -963,7 +1048,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v44';
+const APP_VERSION='v44-three-books-preview';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -1288,10 +1373,11 @@ function renderDashboard(){
   // 统计块
   const mk = monthKey(Date.now());
   const cur = tx.filter(t=>monthKey(t.ts)===mk);
-  const inc = cur.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
-  const fixed = cur.filter(t=>t.group==='fixed').reduce((a,t)=>a+t.amount,0);
-  const elas = cur.filter(t=>t.group==='elastic').reduce((a,t)=>a+t.amount,0);
-  const debt = cur.filter(t=>t.group==='debt').reduce((a,t)=>a+t.amount,0);
+  const core = cur.filter(isCoreTx);
+  const inc = core.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
+  const fixed = core.filter(t=>t.group==='fixed' && t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  const elas = core.filter(t=>t.group==='elastic' && t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  const debt = cur.filter(t=>t.group==='debt' && !isHousingDebtSnapshot(t)).reduce((a,t)=>a+t.amount,0);
   const out = fixed + elas + debt;
   const bal = inc - out;
 
@@ -1301,6 +1387,57 @@ function renderDashboard(){
   renderExpenseTrend();
   renderExpenseRank();
   renderIncomeMix();
+  renderClarityBoard();
+}
+
+/* 三分法改造：侧边栏首屏「账目清晰看板」
+   三个互不污染的数字：生活弹性 / 固定成本 / 外事办未收 */
+function renderClarityBoard(){
+  const el = document.getElementById('clarityBoard');
+  if(!el) return;
+  const mk = VIEW_MONTH==='全部' ? null : VIEW_MONTH;
+  const inScope = t => mk ? monthKey(t.ts)===mk : true;
+  const list = (S.tx||[]).filter(inScope);
+  const core = list.filter(isCoreTx);
+  const sum = (arr,dir) => arr.filter(t=>t.direction===dir).reduce((a,t)=>a+(Number(t.amount)||0),0);
+  const fixed = sum(core.filter(t=>t.group==='fixed'),'out');
+  const elastic = sum(core.filter(t=>t.group==='elastic'||t.group==='income'||t.group==='debt'),'out');
+  /* 工资按日发薪：按实逐日记，月底自动累加，不设固定月薪模板 */
+  const todayKey = dateOnly(Date.now());
+  const todayIncome = sum(core.filter(t=>dateOnly(t.ts)===todayKey),'in');
+  /* 外事办：FIFO 核销，回款超出垫付的部分计入真实收入 */
+  const L = computeWorkLedger();
+  const wm = mk ? L.byMonth[mk] : null;
+  const wnet = workNetAt(mk);
+  const due = workDueAt(mk);
+  const workOut = wm ? wm.out : (mk ? 0 : L.list.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0));
+  const workIn = wm ? wm.in : (mk ? 0 : L.list.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0));
+  const coreIncome = sum(core,'in');
+  const realIncome = coreIncome + wnet;
+  const budget = realIncome - fixed - elastic;
+  const [yy,mm] = (mk || monthKey(Date.now())).split('-').map(Number);
+  const days = new Date(yy, mm, 0).getDate();
+  const fixedDaily = days ? fixed/days : 0;
+  const scopeTxt = mk ? mk+' · ' : '全部 · ';
+  el.innerHTML = `
+    <div class="clarity-grid">
+      <div class="clarity-item life">
+        <div class="clab">生活账（弹性）</div>
+        <div class="cval">${fmt2(elastic)}</div>
+        <div class="csub">餐饮 交通 购物 娱乐等</div>
+      </div>
+      <div class="clarity-item fixed">
+        <div class="clab">固定成本</div>
+        <div class="cval">${fmt2(fixed)}</div>
+        <div class="csub">日均 ${fmt2(fixedDaily)} · 房贷 水电等</div>
+      </div>
+      <div class="clarity-item work">
+        <div class="clab">外事办未收</div>
+        <div class="cval" style="color:${due>0?'#B46A18':'#0F6E56'}">${fmt2(due)}</div>
+        <div class="csub">本月回款 ${fmt2(workIn)} / 垫付 ${fmt2(workOut)}</div>
+      </div>
+    </div>
+    <div class="clarity-note">${scopeTxt}今日入账 ${fmt2(todayIncome)}（按日发薪，按实记） · 真实收入 ${fmt2(realIncome)}（含外事办净收入 ${fmt2(wnet)}） · 收入 − 固定 − 生活 = <b>${fmt2(budget)}</b></div>`;
 }
 
 /* =================== 本月日历 =================== */
@@ -1364,10 +1501,12 @@ function renderIncomeMix(){
   const el=document.getElementById('incomeMix');
   if(!el) return;
   const totals={}; let sum=0;
-  S.tx.filter(t=>t.direction==='in').forEach(t=>{
+  S.tx.filter(t=>t.direction==='in' && isCoreTx(t)).forEach(t=>{
     const c=t.category||'其他收入'; const v=Number(t.amount)||0;
     totals[c]=(totals[c]||0)+v; sum+=v;
   });
+  const wnetMix = workNetAt(VIEW_MONTH);
+  if(wnetMix>0){ totals['外事办净收入']=(totals['外事办净收入']||0)+wnetMix; sum+=wnetMix; }
   if(sum<=0){ el.innerHTML='<div class="muted">还没有收入记录～记一笔收入，或去设置页导入你的收入表吧。</div>'; return; }
   const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   const colors=['#56B98C','#7FC8A9','#F2B5A6','#E8A87C','#9FD8CB','#C9B8E0','#F7D08A'];
@@ -1413,6 +1552,7 @@ function setViewMonth(m){
   renderExpenseMix();
   renderExpenseTrend();
   renderExpenseRank();
+  renderClarityBoard();
 }
 
 /* v30 删除"点击触达明细"：取消 setTxFilter / TX_FILTER / 记账页方向筛选 chip。tx 列表恢复展示全部流水。 */
@@ -1444,20 +1584,34 @@ function renderMonthlySettlement(){
   });
   // 选定月份汇总（收入/支出）
   const filtered = VIEW_MONTH==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===VIEW_MONTH);
-  const inc = filtered.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
-  const out = filtered.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  /* 三分法改造：往来款与房贷余额快照不进收支统计 */
+  const core = filtered.filter(isCoreTx);
+  const work = filtered.filter(isWorkTx);
+  /* 收入 = 日发薪等真实收入 + 外事办回款超出垫付的净额；往来本金不进收入 */
+  const L = computeWorkLedger();
+  const workNet = workNetAt(VIEW_MONTH);
+  const inc = core.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0) + workNet;
+  const out = core.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
   const bal = inc - out;
-  const incN = filtered.filter(t=>t.direction==='in').length;
-  const outN = filtered.filter(t=>t.direction==='out').length;
-  const cnt = filtered.length;
-  if(cnt === 0){
+  const incN = core.filter(t=>t.direction==='in').length + (workNet>0?1:0);
+  const outN = core.filter(t=>t.direction==='out').length;
+  const cnt = core.length;
+  const fixedSum = core.filter(t=>t.group==='fixed' && t.direction==='out').reduce((a,t)=>a+t.amount,0);
+  const elasticSum = out - fixedSum;
+  const wm = VIEW_MONTH==='全部' ? null : L.byMonth[VIEW_MONTH];
+  const workOut = wm ? wm.out : (VIEW_MONTH==='全部' ? L.list.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0) : 0);
+  const workIn = wm ? wm.in : (VIEW_MONTH==='全部' ? L.list.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0) : 0);
+  const workDue = workDueAt(VIEW_MONTH);
+  if(cnt === 0 && work.length === 0){
     box.innerHTML = `<div class="muted" style="padding:22px 0;text-align:center">${VIEW_MONTH==='全部'?'还没有任何流水～点底部"记账"开始你的第一笔':'该月还没有数据，录一笔试试～'}</div>`;
     return;
   }
   // 年度结余：当前年份所有月份累计（独立维度，与月度 chip 无关）
   const yr = new Date().getFullYear();
-  const yrTx = S.tx.filter(t=> new Date(t.ts).getFullYear()===yr);
-  const yrInc = yrTx.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0);
+  const yrTx = S.tx.filter(t=> new Date(t.ts).getFullYear()===yr && isCoreTx(t));
+  const yrWorkNet = Object.keys(L.byMonth).filter(function(k){return k.indexOf(String(yr))===0;})
+    .reduce(function(a,k){return a + L.byMonth[k].netIncome;},0);
+  const yrInc = yrTx.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0) + yrWorkNet;
   const yrOut = yrTx.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0);
   const yrBal = yrInc - yrOut;
   const yrN = yrTx.length;
@@ -1474,7 +1628,7 @@ function renderMonthlySettlement(){
       <div class="settle-item settle-tap" data-settle="in" role="button" tabindex="0">
         <div class="lab">本月收入 ›</div>
         <div class="val in">${fmt2(inc)}</div>
-        <div class="sub">${incN} 笔 · 点看明细</div>
+        <div class="sub">${incN} 笔 · 日发薪按实累加，点看明细</div>
       </div>
       <div class="settle-item ${bal>=0?'mint-final':''}">
         <div class="lab">${VIEW_MONTH==='全部'?'累计结余':'本月结余'}</div>
@@ -1485,6 +1639,23 @@ function renderMonthlySettlement(){
         <div class="lab">${yr} 年结余</div>
         <div class="val ${yrCls}">${fmt2(yrBal)}</div>
         <div class="sub">${yrBal>=0?'本年攒下了':'本年超支'} · ${yrN} 笔</div>
+      </div>
+    </div>
+    <div class="settle-grid-2x2" style="margin-top:12px">
+      <div class="settle-item settle-tap" data-settle="fixed" role="button" tabindex="0">
+        <div class="lab">固定成本 ›</div>
+        <div class="val">${fmt2(fixedSum)}</div>
+        <div class="sub">房贷 水电 话费 · 先扣的部分</div>
+      </div>
+      <div class="settle-item settle-tap" data-settle="elastic" role="button" tabindex="0">
+        <div class="lab">生活弹性 ›</div>
+        <div class="val">${fmt2(elasticSum)}</div>
+        <div class="sub">日常消费 · 可自由支配的部分</div>
+      </div>
+      <div class="settle-item work-final settle-tap" data-settle="work" role="button" tabindex="0" style="grid-column:1/-1">
+        <div class="lab">外事办未收 ›</div>
+        <div class="val" style="color:${workDue>0?'#B46A18':'#0F6E56'}">${fmt2(workDue)}</div>
+        <div class="sub">本月回款 ${fmt2(workIn)} / 垫付 ${fmt2(workOut)} · 超出部分净收入 ${fmt2(workNet)} 已计入收入</div>
       </div>
     </div>`;
   /* v42：绑定「本月支出 / 本月收入」点击 → 打开明细清单 */
@@ -1499,7 +1670,7 @@ function renderMonthlySettlement(){
 /* =================== v42 月度结算明细清单 =================== */
 var SETTLE_DETAIL_TYPE = 'out';
 function openSettleDetail(type){
-  SETTLE_DETAIL_TYPE = (type==='in'||type==='debt') ? type : 'out';
+  SETTLE_DETAIL_TYPE = ['in','debt','work','fixed','elastic'].includes(type) ? type : 'out';
   var sheet=document.getElementById('settleSheet');
   if(!sheet) return;
   sheet.style.display='flex';
@@ -1523,7 +1694,8 @@ function renderSettleDetail(){
     b.classList.toggle('on', b.dataset.type===SETTLE_DETAIL_TYPE);
   });
 
-  var label = SETTLE_DETAIL_TYPE==='in' ? '本月收入' : (SETTLE_DETAIL_TYPE==='debt' ? '本月负债' : '本月支出');
+  var LABELS = {in:'本月收入',debt:'本月负债',work:'本月外事办往来',fixed:'本月固定成本',elastic:'本月生活弹性',out:'本月支出'};
+  var label = LABELS[SETTLE_DETAIL_TYPE] || '本月支出';
   var scope = VIEW_MONTH==='全部' ? '全部' : (VIEW_MONTH===monthKey(Date.now()) ? '本月' : VIEW_MONTH.split('-')[1]+'月');
   if(title) title.textContent = scope + label + '明细';
 
@@ -1531,8 +1703,12 @@ function renderSettleDetail(){
   var list = (S.tx||[]).filter(function(t){
     if(!t || !t.ts) return false;
     if(VIEW_MONTH!=='全部' && monthKey(t.ts)!==VIEW_MONTH) return false;
-    if(SETTLE_DETAIL_TYPE==='debt') return t.group==='debt';
-    return t.direction===SETTLE_DETAIL_TYPE && t.group!=='debt';
+    var T = SETTLE_DETAIL_TYPE;
+    if(T==='work') return isWorkTx(t);
+    if(T==='fixed') return isCoreTx(t) && t.group==='fixed' && t.direction==='out';
+    if(T==='elastic') return isCoreTx(t) && t.direction==='out' && t.group!=='fixed';
+    if(T==='debt') return t.group==='debt';
+    return isCoreTx(t) && t.direction==='out';
   }).sort(function(a,b){ return b.ts - a.ts; });   /* 日期倒序 */
 
   if(!list.length){
@@ -1542,8 +1718,16 @@ function renderSettleDetail(){
     return;
   }
 
-  var sum = list.reduce(function(a,t){ return a + (Number(t.amount)||0); }, 0);
-  var html = '<div class="sd-sum"><span>共 ' + list.length + ' 笔</span><b>' + fmt2(sum) + '</b></div>';
+  /* 收入明细补一行「外事办净收入」（FIFO 核销后回款超出垫付的部分） */
+  var workAdj = SETTLE_DETAIL_TYPE==='in' ? workNetAt(VIEW_MONTH) : 0;
+  var sum = list.reduce(function(a,t){ return a + (Number(t.amount)||0); }, 0) + workAdj;
+  var html = '<div class="sd-sum"><span>共 ' + (list.length + (workAdj>0?1:0)) + ' 笔</span><b>' + fmt2(sum) + '</b></div>';
+  if(workAdj>0){
+    html += '<div class="sd-row"><div class="sd-date">往来<small>净额</small></div>' +
+      '<div class="sd-main"><div class="sd-cat">外事办净收入</div>' +
+      '<div class="sd-note">回款超出垫付的部分，已计入收入</div></div>' +
+      '<div class="sd-amt in">' + fmt2(workAdj) + '</div></div>';
+  }
   html += list.map(function(t){
     var d=new Date(t.ts);
     var md=(d.getMonth()+1)+'/'+d.getDate();
@@ -1583,7 +1767,8 @@ const EXP_CAT = {
 };
 /* 计算支出分类汇总 */
 function expenseTotalsByMonth(month){
-  const src = month==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===month && t.direction==='out');
+  const src = (month==='全部' ? S.tx : S.tx.filter(t=>monthKey(t.ts)===month))
+    .filter(t=>t.direction==='out' && isCoreTx(t));
   const map = {}; let sum = 0;
   src.forEach(t=>{
     const c = t.category || '其他';
@@ -1647,7 +1832,7 @@ function renderExpenseTrend(){
     const tsM = monthKey(ts);
     const inScope = VIEW_MONTH==='全部' || tsM===VIEW_MONTH;
     const tx = inScope
-      ? S.tx.filter(t=>t.direction==='out' && dateOnly(t.ts)===dateOnly(ts))
+      ? S.tx.filter(t=>t.direction==='out' && isCoreTx(t) && dateOnly(t.ts)===dateOnly(ts))
       : [];
     const v = tx.reduce((a,t)=>a+t.amount,0);
     days.push({ts, label: labels[new Date(ts).getDay()], v, isToday: i===0, inScope});
@@ -1730,9 +1915,16 @@ function renderExpenseGrid(){
     {name:'学习',icon:'book',col:'#9FD8CB'},
     {name:'其他',icon:'tag',col:'#EAE0CF'},
   ];
-  el.innerHTML = `<div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${c.name}" data-group="elastic">
-    ${expCellInner(c.name)}
-  </button>`).join('')}</div>`;
+  /* 三分法改造：把原本定义了却没有入口的固定五项放回记账页 */
+  el.innerHTML = `
+    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">固定账单（每月必有）</div>
+    <div class="expense-grid" style="margin-bottom:14px">${CATS.out_fixed.map(c=>`<button class="exp-cell" data-cat="${c}" data-group="fixed">
+      ${expCellInner(c)}
+    </button>`).join('')}</div>
+    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">日常消费（弹性）</div>
+    <div class="expense-grid">${cats.map(c=>`<button class="exp-cell" data-cat="${c.name}" data-group="elastic">
+      ${expCellInner(c.name)}
+    </button>`).join('')}</div>`;
   el.querySelectorAll('.exp-cell').forEach(b=>{
     b.onclick = ()=>{
       pickedCat = { c: b.dataset.cat, g: b.dataset.group };
@@ -1797,6 +1989,30 @@ function renderDebtChips(){
   highlightPicker();
 }
 
+/* 三分法改造：外事办往来分类 chip
+   垫付待收 = 记支出（别人欠你钱），回款冲账 = 记收入（往来款回填） */
+function renderWorkChips(){
+  const el = document.getElementById('workChips');
+  if(!el) return;
+  el.innerHTML = `<div class="expense-grid">${CATS.work.map(c=>`
+    <button class="exp-cell" data-cat="${escapeHtml(c)}" data-group="work">
+      <span class="exp-ico" style="background:#E8C88F44;color:#B46A18">${ICON.debt||ICON.shield}</span>
+      <span class="exp-name">${escapeHtml(c)}</span>
+    </button>`).join('')}</div>
+    <div class="muted" style="font-size:11.5px;line-height:1.6;margin-top:12px">
+      回款先冲最早的垫付（跨月自动承接）；冲不完的差额计入真实收入，没冲完的垫付显示未收。
+    </div>`;
+  el.querySelectorAll('.exp-cell').forEach(b=>{
+    b.onclick = ()=>{
+      pickedCat = { c: b.dataset.cat, g: 'work' };
+      highlightPicker();
+      setTimeout(()=>document.getElementById('amtInp')?.focus(), 60);
+      toast(`已选「${pickedCat.c}」，往来款不计入生活账`);
+    };
+  });
+  highlightPicker();
+}
+
 /* v31 负债二级 chip：选择这笔计入哪个支出分类（8 个支出分类）；
    用于把负债也纳入"支出分类占比"和"月度结余"。 */
 function renderDebtExpChips(){
@@ -1820,7 +2036,7 @@ function renderDebtExpChips(){
   });
 }
 function highlightPicker(){
-  document.querySelectorAll('#expenseGrid .exp-cell, #incomeChips .exp-cell, #debtChips .exp-cell').forEach(b=>{
+  document.querySelectorAll('#expenseGrid .exp-cell, #incomeChips .exp-cell, #debtChips .exp-cell, #workChips .exp-cell').forEach(b=>{
     const on = (b.dataset.cat===pickedCat.c);
     b.classList.toggle('on', on);
   });
@@ -1832,6 +2048,8 @@ function syncPickerArea(){
   const out=document.getElementById('pickerOut');
   const inn=document.getElementById('pickerIn');
   const dbt=document.getElementById('pickerDebt');
+  const wk=document.getElementById('pickerWork');
+  if(wk) wk.style.display = curDir==='work' ? '' : 'none';
   const t=document.getElementById('pickerTitleText');
   const h=document.getElementById('pickerHint');
   const ic=document.getElementById('pickerIc');
@@ -1853,7 +2071,7 @@ function syncPickerArea(){
     if(pickedCat.g!=='income'){
       pickedCat = {c:'KFC兼职', g:'income'};
     }
-  }else{ // debt
+  }else if(curDir==='debt'){ // debt
     out.style.display='none'; inn.style.display='none'; dbt.style.display='';
     t.textContent='负债分类';
     h.textContent='先选负债（房贷/花呗信用卡等），再选计入哪个支出分类，下面填金额日期。';
@@ -1864,6 +2082,13 @@ function syncPickerArea(){
     }
     pickedExpCat = DEBT_TO_EXP_DEFAULT[pickedCat.c] || '其他';
     renderDebtExpChips();
+  }else if(curDir==='work'){
+    out.style.display='none'; inn.style.display='none'; dbt.style.display='none';
+    t.textContent='外事办往来';
+    h.textContent='回款先冲最早的垫付，超出部分自动计收入，未冲完的显示未收。';
+    ic.innerHTML = ICON.debt||ICON.shield;
+    if(pickedCat.g!=='work') pickedCat = { c: CATS.work[0], g: 'work' };
+    renderWorkChips();
   }
   highlightPicker();
   toggleKfcHolidayRow();
@@ -1889,10 +2114,11 @@ function txRow(t){
   const col = t.direction==='in'?'in':'out';
   const chip = escapeHtml(t.category||'其他');
   const style = catChipStyle(t.category, t.group);
+  const workTag = isWorkTx(t) ? '<span class="tx-tag-work">往来</span>' : '';
   return `<div class="tx">
     <span class="ic ${cls}">${icon}</span>
     <span class="info">
-      <span class="c" style="${style}" title="${chip}">${chip}</span>
+      ${workTag}<span class="c" style="${style}" title="${chip}">${chip}</span>
       <span class="n">${escapeHtml(t.note||'')}${t.note?' · ':''}${dateOnly(t.ts).slice(5)}</span>
     </span>
     <span class="amt ${col}">${sign}${fmt(t.amount)}</span>
@@ -2017,6 +2243,7 @@ async function saveTx(){
     category = pickedExpCat;          /* 计入哪个支出分类（如「生活」） */
     group = 'debt';
   }
+  else if(curDir==='work'){ category=pickedCat.c; group='work'; }
   else { category=pickedCat.c; group=pickedCat.g; }
   let note=document.getElementById('noteInp').value.trim();
   if(curDir==='in' && category==='KFC兼职' && document.getElementById('kfcHolidayChk') && document.getElementById('kfcHolidayChk').checked){
@@ -2026,14 +2253,19 @@ async function saveTx(){
   if(curDir==='debt' && debtCat){
     note = (note? note+' · ':'') + `${debtCat}（负债）`;
   }
+  /* 三分法改造：往来款自动打前缀，流水里一眼可辨 */
+  if(curDir==='work'){
+    note = (note? note+' · ':'') + (pickedCat.c==='回款冲账' ? '[外收]' : '[外垫]');
+  }
   const dval=document.getElementById('dateInp').value;
   const ts = dval ? new Date(dval+'T12:00:00').getTime() : Date.now();
-  const direction = curDir==='in'?'in':'out';
+  const direction = (curDir==='in' || (curDir==='work' && category==='回款冲账')) ? 'in' : 'out';
   const amount = Math.round(amt*100)/100;
   if(editingId){
     const idx = S.tx.findIndex(x=>x.id===editingId);
     if(idx>=0){
       S.tx[idx] = { ...S.tx[idx], ts, direction, group, category, amount, note };
+      if(group==='work') S.tx[idx].bucket='work'; else delete S.tx[idx].bucket;
       if(debtCat) S.tx[idx].debtCat = debtCat;  /* 保留负债子类字段 */
     }
     editingId = null;
@@ -2047,6 +2279,7 @@ async function saveTx(){
     return;
   }
   const t={ id:uid(), ts, direction, group, category, amount, note };
+  if(group==='work') t.bucket='work';  /* 往来款打标，与生活账彻底隔离 */
   if(debtCat) t.debtCat = debtCat;  /* 仅负债时挂 debtCat */
   S.tx.push(t);
   const mode=await safePersist();
@@ -2063,11 +2296,13 @@ function editTx(id){
   if(!t){ toast('找不到这笔'); return; }
   editingId = id;
   // 切 dirSeg
-  curDir = t.direction==='in' ? 'in' : (t.group==='debt' ? 'debt' : 'out');
+  curDir = isWorkTx(t) ? 'work' : (t.direction==='in' ? 'in' : (t.group==='debt' ? 'debt' : 'out'));
   document.querySelectorAll('#dirSeg button').forEach(b=>b.classList.toggle('on', b.dataset.dir===curDir));
   syncPickerArea();  // 会按 curDir 重置 pickedCat
   // 恢复原分类（syncPickerArea 会重置，所以后再覆盖）
   pickedCat = { c: t.category, g: t.group };
+  /* 三分法改造：旧「认证服务费」载入为「回款冲账」，保存即完成单笔迁移 */
+  if(curDir==='work' && !CATS.work.includes(t.category)) pickedCat = { c: CATS.work[1], g: 'work' };
   // v31 负债编辑：恢复负债子类（debtCat）和支出分类（pickedExpCat）
   if(curDir==='debt'){
     pickedCat = { c: t.debtCat || t.category, g: 'debt' };
