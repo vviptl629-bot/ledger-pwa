@@ -649,7 +649,11 @@
   .mask.show{display:grid;}
   .modal{background:var(--card); border-radius:20px; padding:22px; max-width:360px; width:100%; box-shadow:var(--shadow);}
   .modal h3{margin:0 0 8px; font-size:17px;}
-  .modal p{font-size:13.5px; color:var(--ink-soft); margin:0 0 16px;}
+  .modal p{font-size:13.5px; color:var(--ink-soft); margin:0 0 16px; white-space:pre-line;}
+  .prune-list{display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px;}
+  .prune-row{display:inline-flex; align-items:center; gap:7px; padding:9px 12px; border:1px solid var(--line2); border-radius:11px; font-size:13px; font-weight:700; color:var(--ink); cursor:pointer; min-height:40px;}
+  .prune-row input{width:16px; height:16px; accent-color:var(--mint-deep); margin:0;}
+  .prune-tip{font-size:12px; line-height:1.65; color:var(--sub); margin:10px 0 0;}
   .err-banner{background:#FFF3F1; border:1px solid #F3C9C2; border-radius:14px; padding:16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
   .err-banner svg{width:24px; height:24px; color:var(--warn);}
 </style>
@@ -850,6 +854,17 @@
         <div id="syncCard"></div>
       </div>
 
+      <!-- 按月份清理：本地流水 + 墓碑 + 云端 Gist 一起处理，避免删了又被同步拉回 -->
+      <div class="card">
+        <h2>按月整理流水</h2>
+        <p class="muted" style="margin-top:-4px;font-size:12.5px;line-height:1.65">勾选要清除的月份。删除会<b>同时同步到云端和其它设备</b>，删前自动导出一份 JSON 备份。</p>
+        <div class="prune-list" id="monthPruneList"></div>
+        <div class="btn-row">
+          <button class="btn warn" id="pruneBtn">清除勾选月份</button>
+        </div>
+        <p class="prune-tip">节奏建议：清掉 8、9 月的混乱数据后，11 月练习记账，12 月起每笔支出都记。</p>
+      </div>
+
       <div class="card">
         <h2><span id="icShield"></span> 数据安全</h2>
         <p class="muted" style="margin-top:-4px">当前为本地保存模式（数据存在本浏览器）。重连资料库后可升级为云端多设备同步。</p>
@@ -1048,7 +1063,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v44-three-books-preview';
+const APP_VERSION='v45-month-prune';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -2391,6 +2406,58 @@ function clearAll(){
   });
 }
 
+/* ============ v45 按月份清理：本地流水 + 墓碑 + 云端一起删 ============
+   只删本地会被 pullGist 的 mergeById 拉回来；只删云端会被本地 push 推回去。
+   所以这里：删 S.tx → 被删 id 写入 TOMB → pushGist 时墓碑随 payload 上云，
+   对端 pullGist 会先并墓碑再 applyTomb，实现跨设备同步删除。 */
+function renderMonthPrune(){
+  var el=document.getElementById('monthPruneList'); if(!el)return;
+  var by={};
+  (S.tx||[]).forEach(function(t){
+    var m=monthKey(t.ts);
+    if(/^\d{4}-\d{2}$/.test(m)) by[m]=(by[m]||0)+1;
+  });
+  var ms=Object.keys(by).sort();
+  if(!ms.length){ el.innerHTML='<span class="muted" style="font-size:12.5px">当前还没有流水可清理。</span>'; return; }
+  el.innerHTML=ms.map(function(m){
+    var on=(m==='2026-08'||m==='2026-09')?' checked':'';
+    return '<label class="prune-row"><input type="checkbox" value="'+m+'"'+on+'>'+m+' · '+by[m]+' 笔</label>';
+  }).join('');
+}
+async function pruneMonths(){
+  var boxes=document.querySelectorAll('#monthPruneList input:checked');
+  if(!boxes.length){ toast('请先勾选要清除的月份'); return; }
+  var months=[]; boxes.forEach(function(b){ months.push(b.value); });
+  var victims=(S.tx||[]).filter(function(t){ return months.indexOf(monthKey(t.ts))>=0; });
+  if(!victims.length){ toast('这些月份没有流水'); return; }
+  var cloud=!!(gist.enabled && gist.token && gist.gistId);
+  openModal('清除 '+months.length+' 个月份的数据？',
+    '将删除 '+victims.length+' 笔流水（'+months.join('、')+'）。\n'+
+    '删除前自动导出备份；删除会写入墓碑并同步'+(cloud?'到云端 Gist，其它设备下次拉取也会删掉':'到本设备')+'。\n'+
+    '此操作不可撤销。',
+    async function(){
+      try{ exportJSON(); }catch(_){}
+      var now=Date.now();
+      victims.forEach(function(t){ if(t && t.id) TOMB[t.id]=now; });
+      saveTomb();
+      S.tx=(S.tx||[]).filter(function(t){ return months.indexOf(monthKey(t.ts))<0; });
+      try{
+        localStorage.setItem(KEY_TX, JSON.stringify(S.tx));
+        localStorage.setItem(KEY_SET, JSON.stringify(S.settings));
+      }catch(_){}
+      renderAll();
+      if(cloud){
+        try{
+          var prev=FORCE_WIPE; FORCE_WIPE=true;  /* 全部删光时也要能推；墓碑一起上云，不会误删对端数据 */
+          try{ await pushGist(); } finally { FORCE_WIPE=prev; }
+          toast('已清除 '+victims.length+' 笔，并同步到云端');
+        }catch(e){ toast('本地已清除，云端同步失败：'+e.message+'（点「上传到云端」重试）'); }
+      } else {
+        toast('已清除 '+victims.length+' 笔');
+      }
+    });
+}
+
 /* =================== modal =================== */
 let modalCb=null;
 function openModal(title,text,cb){
@@ -2489,6 +2556,7 @@ function renderAll(){
   paintIcons();
   renderSync();
   renderCloudWarn();
+  renderMonthPrune();
   maybeShowInstallBar();
   document.getElementById('todayDate').textContent=dateOnly(Date.now())+' · 周日'.replace('周日',weekday());
   if(S.ready || S.error){
@@ -2520,6 +2588,7 @@ function bind(){
   document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
   document.getElementById('importFile').onchange=(e)=>{ if(e.target.files[0]) importJSON(e.target.files[0]); };
   document.getElementById('clearBtn').onclick=clearAll;
+  document.getElementById('pruneBtn').onclick=pruneMonths;
   // modal
   document.getElementById('mCancel').onclick=closeModal;
   document.getElementById('mOk').onclick=()=>{ const cb=modalCb; closeModal(); if(cb) cb(); };
