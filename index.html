@@ -669,6 +669,72 @@
   .prune-tip{font-size:12px; line-height:1.65; color:var(--sub); margin:10px 0 0;}
   .err-banner{background:#FFF3F1; border:1px solid #F3C9C2; border-radius:14px; padding:16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
   .err-banner svg{width:24px; height:24px; color:var(--warn);}
+
+  /* v48 右上角设置入口 */
+  .gear-btn{
+    width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:10px;
+    background:var(--card); color:var(--ink-soft); cursor:pointer; display:flex;
+    align-items:center; justify-content:center; padding:0; margin-left:2px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .gear-btn:active{transform:scale(.94);}
+  .gear-btn svg{width:20px; height:20px;}
+  .set-mask{position:fixed; inset:0; background:rgba(91,82,73,.38); z-index:69; opacity:0; pointer-events:none; transition:opacity .24s;}
+  .set-mask.show{opacity:1; pointer-events:auto;}
+  .set-drawer{
+    position:fixed; top:0; right:0; bottom:0; width:min(90vw,420px); z-index:70;
+    background:var(--cream); box-shadow:-10px 0 32px rgba(91,82,73,.18);
+    transform:translateX(105%); transition:transform .26s ease;
+    display:flex; flex-direction:column;
+  }
+  .set-drawer.open{transform:translateX(0);}
+  .sd-head{
+    display:flex; align-items:center; justify-content:space-between; flex:0 0 auto;
+    padding:16px 18px 13px; border-bottom:1px solid var(--line); font-size:17px; font-weight:800;
+  }
+  .sd-close{
+    border:1px solid var(--line); background:var(--card); color:var(--ink-soft);
+    width:36px; height:36px; border-radius:10px; font-size:22px; line-height:1; cursor:pointer;
+  }
+  .sd-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 14px calc(28px + env(safe-area-inset-bottom));}
+
+  /* v48 大字号日期选择器（替换手机原生控件，字太小看不清） */
+  .dp-mask{position:fixed; inset:0; background:rgba(91,82,73,.42); z-index:89; opacity:0; pointer-events:none; transition:opacity .22s;}
+  .dp-mask.show{opacity:1; pointer-events:auto;}
+  .dp-sheet{
+    position:fixed; left:0; right:0; bottom:0; z-index:90;
+    background:var(--cream); border-radius:22px 22px 0 0; box-shadow:0 -10px 32px rgba(91,82,73,.2);
+    padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+    transform:translateY(105%); transition:transform .26s ease;
+  }
+  .dp-sheet.open{transform:translateY(0);}
+  .dp-head{display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px;}
+  .dp-head .yr{font-size:14px; font-weight:700; color:var(--mint-deep); letter-spacing:1px;}
+  .dp-head .big{font-size:27px; font-weight:800; color:var(--ink); margin-top:3px; line-height:1.2;}
+  .dp-close{border:none; background:transparent; color:var(--ink-soft); font-size:28px; line-height:1; padding:2px 8px; cursor:pointer;}
+  .dp-nav{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;}
+  .dp-nav button{
+    min-width:88px; min-height:46px; border:1px solid var(--line); border-radius:12px;
+    background:var(--card); color:var(--ink); font-size:16px; font-weight:700; cursor:pointer;
+  }
+  .dp-nav .ym{font-size:18px; font-weight:800; color:var(--ink);}
+  .dp-week{display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:14px; font-weight:700; color:var(--ink-soft); padding:6px 0 8px; border-bottom:1px solid var(--line);}
+  .dp-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; padding:10px 0 14px; min-height:300px; align-content:start;}
+  .dp-day{
+    min-height:52px; border:1px solid transparent; border-radius:13px; background:transparent;
+    color:var(--ink); font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;
+  }
+  .dp-day.blank{visibility:hidden;}
+  .dp-day.today{border-color:var(--mint); color:var(--mint-deep);}
+  .dp-day.sel{background:var(--mint-deep); color:#fff; border-color:var(--mint-deep);}
+  .dp-actions{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding-top:6px; border-top:1px solid var(--line);}
+  .dp-actions button{
+    min-height:48px; border:1px solid var(--line); border-radius:12px; background:var(--card);
+    color:var(--ink); font-size:15px; font-weight:700; cursor:pointer;
+  }
+  .dp-actions button.primary{background:var(--mint-deep); color:#fff; border-color:var(--mint-deep);}
+  #dateInp[readonly]{cursor:pointer; font-size:17px; font-weight:700;}
 </style>
 </head>
 <body>
@@ -682,9 +748,6 @@
         <div class="sub">每一笔，都是自由的积累</div>
       </div>
     </div>
-    <div class="nav-item" data-view="dashboard">
-      <span id="icHome"></span> 仪表盘
-    </div>
     <div class="nav-item active" data-view="record">
       <span id="icPen"></span> 10秒记账
     </div>
@@ -694,8 +757,8 @@
     <div class="nav-item" data-view="simulate">
       <span id="icSlider"></span> 情景模拟
     </div>
-    <div class="nav-item" data-view="settings">
-      <span id="icGear"></span> 我的设置
+    <div class="nav-item" data-view="dashboard">
+      <span id="icHome"></span> 仪表盘
     </div>
     <div class="nav-spacer"></div>
     <div class="side-foot">奶油薄荷手账风<br>数据可同步到你的 GitHub 私有仓库</div>
@@ -710,6 +773,7 @@
         <button id="syncRetry" style="display:none">重试</button>
       </span>
       <span class="date" id="todayDate"></span>
+      <button class="gear-btn" id="settingsBtn" type="button" title="设置" aria-label="打开设置"><span id="icGearTop"></span></button>
     </div>
 
     <div id="installBar" style="display:none;align-items:center;gap:12px;background:linear-gradient(135deg,#EAF7F0,#FFF7E9);border:1px solid #CDEADD;border-radius:16px;padding:12px 14px;margin-bottom:16px">
@@ -725,7 +789,7 @@
     <section class="view" id="view-dashboard">
       <div id="cloudWarn" class="cloud-warn" style="display:none">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <div class="cw-txt"><b>数据未开启云端同步</b><br>当前仅保存在本设备浏览器，换手机 / 清缓存会丢失。打开右下「设置 → 云端同步」填入 GitHub Token 即可自动备份每一笔。</div>
+        <div class="cw-txt"><b>数据未开启云端同步</b><br>当前仅保存在本设备浏览器，换手机 / 清缓存会丢失。点右上角 ⚙ 「云端同步」填入 GitHub Token 即可自动备份每一笔。</div>
       </div>
       <!-- 三分法改造：侧边栏首屏的清晰展示区 -->
       <div class="card clarity-card" id="clarityCard">
@@ -792,8 +856,8 @@
         <label class="fld"><span class="t">金额（¥）</span>
           <input type="number" id="amtInp" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
         </label>
-        <label class="fld"><span class="t">日期（可改成过去，补记往期收入）</span>
-          <input type="date" id="dateInp" style="font-size:16px">
+        <label class="fld"><span class="t">日期（点一下选，可改成过去补记）</span>
+          <input type="text" id="dateInp" readonly placeholder="点这里选日期" autocomplete="off">
         </label>
 
         <!-- 内联「分类选择」：支出=8 网格 / 收入=4 chip；点哪个就是这笔的分类 -->
@@ -860,9 +924,15 @@
 
     <!-- 情景模拟（旧 section 保留空容器，避免旧 SW 缓存命中时报错——下次发布清理） -->
     <section class="view" id="view-simulate" style="display:none"></section>
+  </main>
+</div>
 
-    <!-- 设置 -->
-    <section class="view" id="view-settings">
+<!-- v48 设置抽屉：右上角齿轮点开，不占底部导航 -->
+<div class="set-mask" id="setMask"></div>
+<aside class="set-drawer" id="setDrawer" aria-hidden="true">
+  <div class="sd-head"><span>我的设置</span><button class="sd-close" id="setDrawerClose" type="button" aria-label="关闭设置">×</button></div>
+  <div class="sd-scroll">
+    <section id="view-settings">
       <div class="card">
         <div class="tape"></div>
         <h2><span id="icCloud"></span> 云端同步 · 手机 ↔ 网页</h2>
@@ -925,8 +995,8 @@
         </p>
       </div>
     </section>
-  </main>
-</div>
+  </div>
+</aside>
 
 <!-- v42 月度结算明细：点「本月支出 / 本月收入」打开，按日期倒序列出该类型全部流水 -->
 <div class="sheet-overlay" id="settleSheet" style="display:none" aria-hidden="true">
@@ -948,11 +1018,35 @@
 
 <!-- 底部Tab -->
 <nav class="bottomtab">
-  <div class="bt" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
   <div class="bt active" data-view="record"><span id="icPen2"></span>记账</div>
   <div class="bt" data-view="calendar"><span id="icCal2"></span>日历</div>
-  <div class="bt" data-view="settings"><span id="icGear2"></span>设置</div>
+  <div class="bt" data-view="dashboard"><span id="icHome2"></span>仪表盘</div>
 </nav>
+
+<!-- v48 大字号日期选择层 -->
+<div class="dp-mask" id="dpMask"></div>
+<div class="dp-sheet" id="dpSheet" role="dialog" aria-label="选择日期">
+  <div class="dp-head">
+    <div>
+      <div class="yr" id="dpYear">2026年</div>
+      <div class="big" id="dpBig">11月25日 周三</div>
+    </div>
+    <button class="dp-close" id="dpClose" type="button" aria-label="关闭">×</button>
+  </div>
+  <div class="dp-nav">
+    <button id="dpPrev" type="button">‹ 上月</button>
+    <div class="ym" id="dpYM">2026年11月</div>
+    <button id="dpNext" type="button">下月 ›</button>
+  </div>
+  <div class="dp-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+  <div class="dp-grid" id="dpGrid"></div>
+  <div class="dp-actions">
+    <button id="dpToday" type="button">今天</button>
+    <button id="dpYesterday" type="button">昨天</button>
+    <button id="dpClear" type="button">清空</button>
+    <button id="dpOk" class="primary" type="button">确定</button>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 <div class="mask" id="mask">
@@ -1113,7 +1207,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v47-mortgage-auto';
+const APP_VERSION='v48-nav-drawer-bigdate';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -1442,7 +1536,7 @@ function setSync(state, text){
 
 /* =================== 渲染：图标占位（同 id 多元素都填，避免重复 id 漏渲染） =================== */
 function paintIcons(){
-  const map={icHome:'home',icPen:'pen',icClock:'clock',icSlider:'slider',icGear:'gear',icBell:'bell',
+  const map={icHome:'home',icPen:'pen',icClock:'clock',icSlider:'slider',icGear:'gear',icGearTop:'gear',icBell:'bell',
     icChart:'chart',icMix:'chart',icTarget:'target',icList:'list',icCoin:'coin',icCalc:'calc',icBus:'bus',icOt:'ot',icUp:'up',icShield:'shield',icCloud:'shield',icCal:'cal',icInfo:'warn'};
   for(const id in map){
     const html = ICON[map[id]];
@@ -1461,18 +1555,34 @@ function paintIcons(){
 }
 
 /* =================== 视图切换 =================== */
-const TITLES={dashboard:'仪表盘',record:'10秒记账',calendar:'日历',simulate:'情景模拟',settings:'我的设置'};
+const TITLES={dashboard:'仪表盘',record:'10秒记账',calendar:'日历',simulate:'情景模拟'};
 const SET_LAST_VIEW='wb_ledger_lastview_v1'; /* v28 记忆上次停留页面，刷新不跳首页 */
 function switchView(v){
+  if(v==='settings'){ openSettingsDrawer(); return; } /* v48 设置改为右上角抽屉 */
+  closeSettingsDrawer();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
   document.querySelectorAll('.bt').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
   document.querySelectorAll('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
   document.getElementById('pageTitle').textContent=TITLES[v];
   if(v==='record'){ renderExpenseGrid(); renderIncomeChips(); renderDebtChips(); syncPickerArea(); }
   if(v==='calendar'){ renderCalendar(); showCalDay(dateOnly(Date.now())); }
-  if(v==='settings'){ renderSyncCard(); fillMortgageCfg(); }
   window.scrollTo(0,0);
   try{ localStorage.setItem(SET_LAST_VIEW, v); }catch(_){}
+}
+
+/* =================== v48 设置抽屉 =================== */
+function openSettingsDrawer(){
+  const d=document.getElementById('setDrawer'), m=document.getElementById('setMask');
+  if(!d) return;
+  d.classList.add('open'); if(m) m.classList.add('show');
+  d.setAttribute('aria-hidden','false');
+  renderSyncCard(); fillMortgageCfg(); renderMonthPrune();
+}
+function closeSettingsDrawer(){
+  const d=document.getElementById('setDrawer'), m=document.getElementById('setMask');
+  if(!d) return;
+  d.classList.remove('open'); if(m) m.classList.remove('show');
+  d.setAttribute('aria-hidden','true');
 }
 
 /* =================== 仪表盘 =================== */
@@ -2662,7 +2772,7 @@ async function boot(){
   // v28：刷新后停留在上次打开的页面（默认改为「记账」record；若用户曾切换到其他页则尊重其上次停留页）
   try{
     const last = localStorage.getItem(SET_LAST_VIEW);
-    if(last && TITLES[last]) switchView(last);
+    if(last && TITLES[last]) switchView(last); else switchView('record');
   }catch(_){}
   // v42：月度结算明细层 —— 返回按钮 + 类型切换（支出/收入/负债）
   var _sBack=document.getElementById('settleBack');
@@ -2694,10 +2804,93 @@ function renderAll(){
 }
 function weekday(){ const w=['周日','周一','周二','周三','周四','周五','周六']; return w[new Date().getDay()]; }
 
+/* =================== v48 大字号日期选择器 =================== */
+let dpView=null;   // 当前显示的年月 Date
+let dpSel='';      // 当前选中 YYYY-MM-DD
+function openDatePicker(){
+  const inp=document.getElementById('dateInp');
+  const v=(inp && inp.value) ? inp.value : dateOnly(Date.now());
+  dpSel=v;
+  const p=v.split('-');
+  dpView=new Date(+p[0], (+p[1])-1, 1);
+  renderDP();
+  const s=document.getElementById('dpSheet'), m=document.getElementById('dpMask');
+  if(s) s.classList.add('open'); if(m) m.classList.add('show');
+}
+function closeDatePicker(){
+  const s=document.getElementById('dpSheet'), m=document.getElementById('dpMask');
+  if(s) s.classList.remove('open'); if(m) m.classList.remove('show');
+}
+function dpWeekName(d){ return '周'+['日','一','二','三','四','五','六'][d.getDay()]; }
+function renderDP(){
+  const grid=document.getElementById('dpGrid'); if(!grid || !dpView) return;
+  const y=dpView.getFullYear(), mo=dpView.getMonth();
+  const yEl=document.getElementById('dpYear'), ymEl=document.getElementById('dpYM'), bigEl=document.getElementById('dpBig');
+  if(yEl) yEl.textContent=y+'年';
+  if(ymEl) ymEl.textContent=y+'年'+(mo+1)+'月';
+  const sp=dpSel.split('-');
+  if(bigEl) bigEl.textContent=(+sp[1])+'月'+(+sp[2])+'日 '+dpWeekName(new Date(y,mo,+sp[2]));
+  // 周一开头：把周日(0)挪到末尾
+  const firstDow=(new Date(y,mo,1).getDay()+6)%7;
+  const days=new Date(y,mo+1,0).getDate();
+  const today=dateOnly(Date.now());
+  let html='';
+  for(let i=0;i<firstDow;i++) html+='<button type="button" class="dp-day blank" tabindex="-1"></button>';
+  for(let d=1;d<=days;d++){
+    const ds=y+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const cls='dp-day'+(ds===today?' today':'')+(ds===dpSel?' sel':'');
+    html+='<button type="button" class="'+cls+'" data-d="'+ds+'">'+d+'</button>';
+  }
+  grid.innerHTML=html;
+  grid.querySelectorAll('.dp-day[data-d]').forEach(b=>b.onclick=()=>{
+    dpSel=b.dataset.d; renderDP();
+  });
+}
+function dpShiftMonth(delta){
+  if(!dpView) return;
+  dpView=new Date(dpView.getFullYear(), dpView.getMonth()+delta, 1);
+  renderDP();
+}
+function dpPickRelative(offsetDays){
+  const d=new Date(); d.setDate(d.getDate()+offsetDays);
+  dpSel=dateOnly(d.getTime());
+  dpView=new Date(d.getFullYear(), d.getMonth(), 1);
+  renderDP();
+}
+function dpConfirm(){
+  const inp=document.getElementById('dateInp');
+  if(inp && dpSel) inp.value=dpSel;
+  closeDatePicker();
+}
+function dpClearDate(){
+  const inp=document.getElementById('dateInp');
+  if(inp) inp.value='';
+  closeDatePicker();
+}
+
 /* =================== 事件绑定 =================== */
 function bind(){
   document.querySelectorAll('.nav-item,.bt').forEach(n=>n.onclick=()=>switchView(n.dataset.view));
   document.getElementById('syncRetry').onclick=()=>boot();
+  // v48 设置抽屉
+  const sBtn=document.getElementById('settingsBtn'); if(sBtn) sBtn.onclick=openSettingsDrawer;
+  const sClose=document.getElementById('setDrawerClose'); if(sClose) sClose.onclick=closeSettingsDrawer;
+  const sMask=document.getElementById('setMask'); if(sMask) sMask.onclick=closeSettingsDrawer;
+  // v48 大字号日期选择器
+  const dateEl=document.getElementById('dateInp'); if(dateEl) dateEl.onclick=openDatePicker;
+  const bindClick=(id,fn)=>{ const e=document.getElementById(id); if(e) e.onclick=fn; };
+  bindClick('dpClose',closeDatePicker);
+  bindClick('dpMask',closeDatePicker);
+  bindClick('dpPrev',()=>dpShiftMonth(-1));
+  bindClick('dpNext',()=>dpShiftMonth(1));
+  bindClick('dpToday',()=>dpPickRelative(0));
+  bindClick('dpYesterday',()=>dpPickRelative(-1));
+  bindClick('dpClear',dpClearDate);
+  bindClick('dpOk',dpConfirm);
+  document.addEventListener('keydown',(e)=>{
+    if(e.key!=='Escape') return;
+    closeDatePicker(); closeSettingsDrawer();
+  });
   // 记账
   document.querySelectorAll('#dirSeg button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#dirSeg button').forEach(x=>x.classList.remove('on'));
