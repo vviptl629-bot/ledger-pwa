@@ -237,6 +237,13 @@
   
   
   
+  /* v47 方案A：房贷/账单/生活 三列并排 */
+  .settle-triple{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:6px;}
+  .settle-triple .settle-item{padding:14px 8px; border-radius:14px; min-width:0; background:var(--cream2); border:1px solid var(--line2); text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;}
+  .settle-triple .settle-item .lab{font-size:11px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+  .settle-triple .settle-item .val{font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.15; letter-spacing:-.4px; white-space:nowrap;}
+  .settle-triple .settle-item .sub{font-size:10px; color:var(--ink-soft); line-height:1.35;}
+  .settle-triple .settle-tap{cursor:pointer;}
   .settle-grid-2x2{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px; padding:6px;}
   .settle-grid-2x2 .settle-item{padding:16px 12px; border-radius:14px; min-width:0; background:var(--cream2); border:1px solid var(--line2);}
   .settle-grid-2x2 .settle-item + .settle-item{position:static;}  
@@ -873,6 +880,28 @@
         <p class="prune-tip">节奏建议：清掉 8、9 月的混乱数据后，11 月练习记账，12 月起每笔支出都记。</p>
       </div>
 
+      <!-- v47 房贷自动记账配置 -->
+      <div class="card" id="mortgageCard">
+        <h2>房贷自动记账</h2>
+        <p class="muted" style="margin-top:-4px;font-size:12.5px;line-height:1.65">每月扣款日当天或之后打开账本，自动记一笔房贷，不用手填。已手动记过或删掉的月份不会重复记。</p>
+        <label class="fld" style="display:flex;align-items:center;gap:9px;margin:12px 0">
+          <input type="checkbox" id="mtgEnabled" style="width:18px;height:18px;accent-color:var(--mint)">
+          <span class="t" style="margin:0;font-weight:600">启用自动记账</span>
+        </label>
+        <div class="btn-row" style="gap:10px">
+          <label class="fld" style="flex:1;margin:0"><span class="t">金额（¥）</span>
+            <input type="number" id="mtgAmount" inputmode="decimal" step="0.01" min="0" value="2575.88">
+          </label>
+          <label class="fld" style="flex:1;margin:0"><span class="t">每月扣款日</span>
+            <input type="number" id="mtgDay" inputmode="numeric" step="1" min="1" max="28" value="5">
+          </label>
+        </div>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn" id="mtgSaveBtn">保存房贷设置</button>
+        </div>
+        <p class="prune-tip" id="mtgStatus"></p>
+      </div>
+
       <div class="card">
         <h2><span id="icShield"></span> 数据安全</h2>
         <p class="muted" style="margin-top:-4px">当前为本地保存模式（数据存在本浏览器）。重连资料库后可升级为云端多设备同步。</p>
@@ -911,6 +940,8 @@
     <button type="button" data-type="in">收入</button>
     <button type="button" data-type="debt">负债</button>
     <button type="button" data-type="work">往来</button>
+    <button type="button" data-type="mortgage">房贷</button>
+    <button type="button" data-type="bill">账单</button>
   </div>
   <div class="sheet-body" id="settleBody"></div>
 </div>
@@ -978,14 +1009,25 @@ const DEFAULT_SETTINGS = {
   netMonthly:8000, payMonths:12, workCostMonthly:1500,
   presentHoursDay:9, commuteHoursDay:2, workDaysMonth:22, overtimeHoursMonth:20,
   currentSavings:80000, freedomGoal:1500000, safetyGoal:100000, withdrawRate:4,
-  kfcRateNormal:22, kfcRateHoliday:48
+  kfcRateNormal:22, kfcRateHoliday:48,
+  /* v47 房贷自动记账：金额/扣款日/开关。可在设置页改；为空表示未启用。 */
+  mortgage:{ enabled:true, amount:2575.88, day:5 }
 };
 const CATS = {
   in:['KFC兼职','外卖','其他收入'],
   work:['垫付待收','回款冲账'],
-  out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],
+  /* v47 方案A：固定账单拆开——房贷是真固定（自动记账），其余是金额浮动的月度账单 */
+  out_mortgage:['房租/房贷'],
+  out_bill:['水电煤','话费','保险','订阅'],
+  out_fixed:['房租/房贷','水电煤','话费','保险','订阅'],  /* 保留给旧代码/旧数据兜底 */
   out_elastic:['餐饮','交通','购物','娱乐','生活','医疗','学习','其他']
 };
+/* v47 按分类名判定，兼容历史 group='fixed' 的旧流水：
+   房贷 = 房租/房贷；账单 = 水电煤/话费/保险/订阅；其余弹性支出。 */
+const MORTGAGE_CATS = ['房租/房贷','房贷'];
+const BILL_CATS = CATS.out_bill;
+function isMortgageTx(t){ return !!(t && t.direction==='out' && isCoreTx(t) && MORTGAGE_CATS.indexOf(t.category)>=0); }
+function isBillTx(t){ return !!(t && t.direction==='out' && isCoreTx(t) && BILL_CATS.indexOf(t.category)>=0); }
 /* 三分法改造：旧数据里「认证服务费」= 外事办回款，统计时按往来款隔离 */
 const LEGACY_WORK_CAT = '认证服务费';
 function isWorkTx(t){
@@ -1071,7 +1113,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v46-ui-compact';
+const APP_VERSION='v47-mortgage-auto';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -1083,6 +1125,42 @@ function loadTomb(){ try{ TOMB=JSON.parse(localStorage.getItem(KEY_TOMB)||'{}')|
 function saveTomb(){ try{ localStorage.setItem(KEY_TOMB, JSON.stringify(TOMB)); }catch(e){} }
 /* 按墓碑过滤掉已删除的流水（拉取云端数据后 / 合并墓碑后调用） */
 function applyTomb(){ S.tx=(S.tx||[]).filter(function(t){ return !t || !TOMB[t.id]; }); }
+
+/* ============ v47 房贷自动记账 ============
+   规则：每月扣款日（默认 5 日）当天或之后打开账本，自动补记当月房贷一笔。
+   防重复：id 固定为 auto-mtg-YYYY-MM —— 同一月无论打开多少次都只会有一笔，
+   跨设备 mergeById 也按同一 id 合并，不会各记一笔。
+   防复活：用户手动删掉自动房贷 → 墓碑记下该 id → 以后不再自动补这个月。
+   金额/日期可在设置页改，改后对“未来月份”生效，已生成的月份不动（避免篡改历史）。 */
+function mortgageCfg(){
+  var m=(S.settings && S.settings.mortgage)||{};
+  return {
+    enabled: m.enabled!==false,
+    amount: Math.max(0, Number(m.amount)||0),
+    day: Math.min(28, Math.max(1, Number(m.day)||5))
+  };
+}
+function autoMortgageId(mk){ return 'auto-mtg-'+mk; }
+function ensureAutoMortgage(){
+  try{
+    var cfg=mortgageCfg();
+    if(!cfg.enabled || cfg.amount<=0) return 0;
+    var now=new Date();
+    if(now.getDate() < cfg.day) return 0;              // 未到扣款日，不提前记
+    var mk=monthKey(now.getTime());
+    var id=autoMortgageId(mk);
+    if(TOMB[id]) return 0;                             // 用户删过这个月 → 不再补
+    if((S.tx||[]).some(function(t){ return t && t.id===id; })) return 0;  // 已有，幂等
+    // 当月若已手动记过房贷（任意房贷类），也不重复记
+    if((S.tx||[]).some(function(t){ return isMortgageTx(t) && monthKey(t.ts)===mk; })) return 0;
+    var ts=new Date(now.getFullYear(), now.getMonth(), cfg.day, 12, 0, 0).getTime();
+    S.tx.push({
+      id:id, ts:ts, direction:'out', group:'fixed', category:'房租/房贷',
+      amount:cfg.amount, note:'房贷自动记账（每月'+cfg.day+'日）', auto:true
+    });
+    return 1;
+  }catch(e){ return 0; }
+}
             // 默认 90 天
                // 到期前 N 天开始提醒
 /* ============ GitHub Gist 云端同步（与工作台/学习台/计算器一致） ============ */
@@ -1090,6 +1168,27 @@ const GIST_FILE='ledger-data.json';
 var gist={enabled:false,token:'',gistId:'',_t:null,_retry:null,_lastOk:0};
 try{ var _g=JSON.parse(localStorage.getItem(KEY_SYNC)||'{}'); gist.enabled=!!_g.enabled; gist.token=_g.token||''; gist.gistId=_g.gistId||''; }catch(e){}
 function saveSyncCfg(){ localStorage.setItem(KEY_SYNC, JSON.stringify({enabled:gist.enabled,token:gist.token,gistId:gist.gistId})); }
+
+/* v47 房贷设置：回填 + 保存（对未来月份生效，已生成的月份不改） */
+function fillMortgageCfg(){
+  var cfg=mortgageCfg();
+  var e=document.getElementById('mtgEnabled'); if(e) e.checked=cfg.enabled;
+  var a=document.getElementById('mtgAmount'); if(a) a.value=cfg.amount||2575.88;
+  var d=document.getElementById('mtgDay'); if(d) d.value=cfg.day;
+  var s=document.getElementById('mtgStatus');
+  if(s) s.textContent='当前：每月'+cfg.day+'日自动记 ¥'+fmt2(cfg.amount)+'（'+(cfg.enabled?'已启用':'已关闭')+'）';
+}
+function saveMortgageCfg(){
+  var en=document.getElementById('mtgEnabled');
+  var am=document.getElementById('mtgAmount');
+  var dy=document.getElementById('mtgDay');
+  var amount=Math.max(0,Number(am&&am.value)||0);
+  var day=Math.min(28,Math.max(1,Number(dy&&dy.value)||5));
+  if(amount<=0){ toast('金额要大于 0'); return; }
+  if(!S.settings) S.settings=clone(DEFAULT_SETTINGS);
+  S.settings.mortgage={ enabled: !!(en&&en.checked), amount:amount, day:day };
+  safePersist().then(function(){ fillMortgageCfg(); toast('房贷设置已保存'); });
+}
 function syncStatus(msg,cls){ var el=document.getElementById('syncStatus'); if(!el)return; el.textContent=msg||''; el.className='sync-status'+(cls?' '+cls:''); }
 /* v38：推送前过滤示例数据——这是"异常数据上云"的最后一道理闸门。
    即便本地因历史原因残留了 seed，也绝不会写进云端 Gist。 */
@@ -1371,7 +1470,7 @@ function switchView(v){
   document.getElementById('pageTitle').textContent=TITLES[v];
   if(v==='record'){ renderExpenseGrid(); renderIncomeChips(); renderDebtChips(); syncPickerArea(); }
   if(v==='calendar'){ renderCalendar(); showCalDay(dateOnly(Date.now())); }
-  if(v==='settings'){ renderSyncCard(); }
+  if(v==='settings'){ renderSyncCard(); fillMortgageCfg(); }
   window.scrollTo(0,0);
   try{ localStorage.setItem(SET_LAST_VIEW, v); }catch(_){}
 }
@@ -1423,8 +1522,10 @@ function renderClarityBoard(){
   const list = (S.tx||[]).filter(inScope);
   const core = list.filter(isCoreTx);
   const sum = (arr,dir) => arr.filter(t=>t.direction===dir).reduce((a,t)=>a+(Number(t.amount)||0),0);
-  const fixed = sum(core.filter(t=>t.group==='fixed'),'out');
-  const elastic = sum(core.filter(t=>t.group==='elastic'||t.group==='income'||t.group==='debt'),'out');
+  /* v47 方案A：房贷（真固定）与浮动账单（水电煤/话费/保险/订阅）分开，按分类名判定兼容旧数据 */
+  const mortgage = sum(core.filter(isMortgageTx),'out');
+  const bill = sum(core.filter(isBillTx),'out');
+  const elastic = core.filter(t=>t.direction==='out').reduce((a,t)=>a+(Number(t.amount)||0),0) - mortgage - bill;
   /* 工资按日发薪：按实逐日记，月底自动累加，不设固定月薪模板 */
   const todayKey = dateOnly(Date.now());
   const todayIncome = sum(core.filter(t=>dateOnly(t.ts)===todayKey),'in');
@@ -1437,30 +1538,25 @@ function renderClarityBoard(){
   const workIn = wm ? wm.in : (mk ? 0 : L.list.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0));
   const coreIncome = sum(core,'in');
   const realIncome = coreIncome + wnet;
-  const budget = realIncome - fixed - elastic;
-  const [yy,mm] = (mk || monthKey(Date.now())).split('-').map(Number);
-  const days = new Date(yy, mm, 0).getDate();
-  const fixedDaily = days ? fixed/days : 0;
+  const budget = realIncome - mortgage - bill - elastic;
+  const cfg = mortgageCfg();
   const scopeTxt = mk ? mk+' · ' : '全部 · ';
   el.innerHTML = `
     <div class="clarity-grid">
       <div class="clarity-item life">
         <div class="clab">生活账</div>
         <div class="cval">${fmt2(elastic)}</div>
-        <div class="csub">餐饮 交通 购物</div>
       </div>
       <div class="clarity-item fixed">
-        <div class="clab">固定成本</div>
-        <div class="cval">${fmt2(fixed)}</div>
-        <div class="csub">日均 ${fmt2(fixedDaily)}</div>
+        <div class="clab">房贷${cfg.enabled?' 🤖':''}</div>
+        <div class="cval">${fmt2(mortgage)}</div>
       </div>
       <div class="clarity-item work">
-        <div class="clab">外事办未收</div>
-        <div class="cval" style="color:${due>0?'#B46A18':'#0F6E56'}">${fmt2(due)}</div>
-        <div class="csub">回款 ${fmt2(workIn)} / 垫付 ${fmt2(workOut)}</div>
+        <div class="clab">月度账单</div>
+        <div class="cval">${fmt2(bill)}</div>
       </div>
     </div>
-    <div class="clarity-note">${scopeTxt}今日入账 ${fmt2(todayIncome)} · 收入 − 固定 − 生活 = <b>${fmt2(budget)}</b> · 明细见下方结算</div>`;
+    <div class="clarity-note">${scopeTxt}外事办未收 ${fmt2(due)} · 今日入账 ${fmt2(todayIncome)} · 收入 − 房贷 − 账单 − 生活 = <b>${fmt2(budget)}</b></div>`;
 }
 
 /* =================== 本月日历 =================== */
@@ -1619,8 +1715,10 @@ function renderMonthlySettlement(){
   const incN = core.filter(t=>t.direction==='in').length + (workNet>0?1:0);
   const outN = core.filter(t=>t.direction==='out').length;
   const cnt = core.length;
-  const fixedSum = core.filter(t=>t.group==='fixed' && t.direction==='out').reduce((a,t)=>a+t.amount,0);
-  const elasticSum = out - fixedSum;
+  /* v47 方案A：房贷 / 月度账单 / 生活弹性 三分，按分类名判定（兼容旧 group） */
+  const mortgageSum = core.filter(isMortgageTx).reduce((a,t)=>a+(Number(t.amount)||0),0);
+  const billSum = core.filter(isBillTx).reduce((a,t)=>a+(Number(t.amount)||0),0);
+  const elasticSum = out - mortgageSum - billSum;
   const wm = VIEW_MONTH==='全部' ? null : L.byMonth[VIEW_MONTH];
   const workOut = wm ? wm.out : (VIEW_MONTH==='全部' ? L.list.filter(t=>t.direction==='out').reduce((a,t)=>a+t.amount,0) : 0);
   const workIn = wm ? wm.in : (VIEW_MONTH==='全部' ? L.list.filter(t=>t.direction==='in').reduce((a,t)=>a+t.amount,0) : 0);
@@ -1664,17 +1762,24 @@ function renderMonthlySettlement(){
         <div class="sub">${yrBal>=0?'本年攒下了':'本年超支'} · ${yrN} 笔</div>
       </div>
     </div>
-    <div class="settle-grid-2x2" style="margin-top:12px">
-      <div class="settle-item settle-tap" data-settle="fixed" role="button" tabindex="0">
-        <div class="lab">固定成本 ›</div>
-        <div class="val">${fmt2(fixedSum)}</div>
-        <div class="sub">房贷 水电 话费 · 先扣的部分</div>
+    <div class="settle-triple" style="margin-top:12px">
+      <div class="settle-item settle-tap" data-settle="mortgage" role="button" tabindex="0">
+        <div class="lab">房贷 ›</div>
+        <div class="val">${fmt2(mortgageSum)}</div>
+        <div class="sub">每月固定 · 自动记账</div>
+      </div>
+      <div class="settle-item settle-tap" data-settle="bill" role="button" tabindex="0">
+        <div class="lab">月度账单 ›</div>
+        <div class="val">${fmt2(billSum)}</div>
+        <div class="sub">水电 话费 保险 订阅 · 金额浮动</div>
       </div>
       <div class="settle-item settle-tap" data-settle="elastic" role="button" tabindex="0">
         <div class="lab">生活弹性 ›</div>
         <div class="val">${fmt2(elasticSum)}</div>
-        <div class="sub">日常消费 · 可自由支配的部分</div>
+        <div class="sub">日常消费 · 可自由支配</div>
       </div>
+    </div>
+    <div class="settle-grid-2x2" style="margin-top:12px">
       <div class="settle-item work-final settle-tap" data-settle="work" role="button" tabindex="0" style="grid-column:1/-1">
         <div class="lab">外事办未收 ›</div>
         <div class="val" style="color:${workDue>0?'#B46A18':'#0F6E56'}">${fmt2(workDue)}</div>
@@ -1693,7 +1798,7 @@ function renderMonthlySettlement(){
 /* =================== v42 月度结算明细清单 =================== */
 var SETTLE_DETAIL_TYPE = 'out';
 function openSettleDetail(type){
-  SETTLE_DETAIL_TYPE = ['in','debt','work','fixed','elastic'].includes(type) ? type : 'out';
+  SETTLE_DETAIL_TYPE = ['in','debt','work','mortgage','bill','elastic','out'].includes(type) ? type : 'out';
   var sheet=document.getElementById('settleSheet');
   if(!sheet) return;
   sheet.style.display='flex';
@@ -1717,7 +1822,7 @@ function renderSettleDetail(){
     b.classList.toggle('on', b.dataset.type===SETTLE_DETAIL_TYPE);
   });
 
-  var LABELS = {in:'本月收入',debt:'本月负债',work:'本月外事办往来',fixed:'本月固定成本',elastic:'本月生活弹性',out:'本月支出'};
+  var LABELS = {in:'本月收入',debt:'本月负债',work:'本月外事办往来',mortgage:'本月房贷',bill:'本月月度账单',fixed:'本月固定成本',elastic:'本月生活弹性',out:'本月支出'};
   var label = LABELS[SETTLE_DETAIL_TYPE] || '本月支出';
   var scope = VIEW_MONTH==='全部' ? '全部' : (VIEW_MONTH===monthKey(Date.now()) ? '本月' : VIEW_MONTH.split('-')[1]+'月');
   if(title) title.textContent = scope + label + '明细';
@@ -1728,8 +1833,10 @@ function renderSettleDetail(){
     if(VIEW_MONTH!=='全部' && monthKey(t.ts)!==VIEW_MONTH) return false;
     var T = SETTLE_DETAIL_TYPE;
     if(T==='work') return isWorkTx(t);
+    if(T==='mortgage') return isMortgageTx(t);
+    if(T==='bill') return isBillTx(t);
     if(T==='fixed') return isCoreTx(t) && t.group==='fixed' && t.direction==='out';
-    if(T==='elastic') return isCoreTx(t) && t.direction==='out' && t.group!=='fixed';
+    if(T==='elastic') return isCoreTx(t) && t.direction==='out' && !isMortgageTx(t) && !isBillTx(t);
     if(T==='debt') return t.group==='debt';
     return isCoreTx(t) && t.direction==='out';
   }).sort(function(a,b){ return b.ts - a.ts; });   /* 日期倒序 */
@@ -1940,8 +2047,12 @@ function renderExpenseGrid(){
   ];
   /* 三分法改造：把原本定义了却没有入口的固定五项放回记账页 */
   el.innerHTML = `
-    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">固定账单（每月必有）</div>
-    <div class="expense-grid" style="margin-bottom:14px">${CATS.out_fixed.map(c=>`<button class="exp-cell" data-cat="${c}" data-group="fixed">
+    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">房贷（每月5日自动记，无需手填）</div>
+    <div class="expense-grid" style="margin-bottom:14px">${CATS.out_mortgage.map(c=>`<button class="exp-cell" data-cat="${c}" data-group="fixed">
+      ${expCellInner(c)}
+    </button>`).join('')}</div>
+    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">月度账单（金额每月不同）</div>
+    <div class="expense-grid" style="margin-bottom:14px">${CATS.out_bill.map(c=>`<button class="exp-cell" data-cat="${c}" data-group="bill">
       ${expCellInner(c)}
     </button>`).join('')}</div>
     <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">日常消费（弹性）</div>
@@ -2082,7 +2193,7 @@ function syncPickerArea(){
     h.textContent='点哪个就是这笔的分类，下面只填金额和日期。';
     ic.innerHTML = ICON.pen;
     // 若 pickedCat 不是支出分类，重置为支出默认「餐饮」
-    if(pickedCat.g!=='elastic' && pickedCat.g!=='fixed'){
+    if(pickedCat.g!=='elastic' && pickedCat.g!=='fixed' && pickedCat.g!=='bill'){
       pickedCat = {c:'餐饮', g:'elastic'};
     }
   }else if(curDir==='in'){
@@ -2531,6 +2642,16 @@ async function boot(){
       <button class="btn" style="width:auto;padding:10px 18px" onclick="boot()">重试</button>
     </div>`;
   }
+  /* v47 房贷自动记账：等云端拉取完再补，避免与手机端已记的那笔重复。
+     hasLocal 分支下 pullGist 未 await，这里补拉一次；随后 ensure 靠固定 id 幂等。 */
+  if(gist.enabled && gist.token && gist.gistId){
+    try{ await pullGist(true); }catch(_){}
+  }
+  var autoAdded=ensureAutoMortgage();
+  if(autoAdded){
+    try{ localStorage.setItem(KEY_TX, JSON.stringify(S.tx)); }catch(_){}
+    try{ await pushGist(); }catch(_){}
+  }
   // 无论成功失败，先把界面画出来（不白屏）
   renderAll();
   gistInit();
@@ -2597,6 +2718,7 @@ function bind(){
   document.getElementById('importFile').onchange=(e)=>{ if(e.target.files[0]) importJSON(e.target.files[0]); };
   document.getElementById('clearBtn').onclick=clearAll;
   document.getElementById('pruneBtn').onclick=pruneMonths;
+  document.getElementById('mtgSaveBtn').onclick=saveMortgageCfg;
   // modal
   document.getElementById('mCancel').onclick=closeModal;
   document.getElementById('mOk').onclick=()=>{ const cb=modalCb; closeModal(); if(cb) cb(); };
