@@ -256,18 +256,23 @@
   /* 三分法改造：账目清晰看板 + 外事办往来色 */
   .clarity-card h2{display:flex;align-items:center;gap:8px}
   .clarity-badge{font-size:11px;font-weight:700;color:var(--mint-deep);border:1px solid var(--mint);border-radius:999px;padding:2px 9px;background:#EAF7F0}
-  .clarity-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:6px 2px}
-  .clarity-item{border:1px solid var(--line2);border-radius:14px;padding:13px 12px;min-width:0;background:var(--cream2)}
+  /* v46：看板压成一条横排小卡——月度结算第二排已有同样的三项，这里只留速览数字，去掉重复说明 */
+  .clarity-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:2px 0}
+  .clarity-item{border:1px solid var(--line2);border-radius:12px;padding:9px 9px;min-width:0;background:var(--cream2)}
   .clarity-item.life b{color:var(--mint-deep)}
   .clarity-item.fixed b{color:#5F5E5A}
   .clarity-item.work b{color:#B46A18}
-  .clarity-item .clab{font-size:11.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .clarity-item .cval{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .clarity-item .csub{font-size:11px;color:var(--ink-soft);margin-top:4px;line-height:1.4}
-  .clarity-note{font-size:11.5px;color:var(--ink-soft);padding:2px 2px 0;line-height:1.5}
+  .clarity-item .clab{font-size:10.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clarity-item .cval{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.25;margin-top:3px;letter-spacing:-.4px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+  .clarity-item .csub{display:none}
+  .clarity-note{font-size:11px;color:var(--ink-soft);padding:6px 2px 0;line-height:1.5}
+  .clarity-note b{font-variant-numeric:tabular-nums}
   .work-final{background:#FFF6E8!important;border-color:#E8C88F!important}
   .work-final .lab{color:#B46A18!important}
-  #dirSeg button[data-dir="work"].on{background:#B46A18;color:#fff}
+  /* v46 需求3：外事办与其余三个方向按钮同宽同高——四等分一行，不换行 */
+  #dirSeg{flex-wrap:nowrap;gap:6px}
+  #dirSeg button{min-width:0; flex:1 1 0; padding:10px 2px; font-size:13.5px; white-space:nowrap}
+  #dirSeg button[data-dir="work"].on{background:#B46A18;color:#fff;border-color:#B46A18}
   .tx-tag-work{display:inline-block;font-size:10px;font-weight:800;color:#B46A18;border:1px solid #E8C88F;border-radius:6px;padding:0 4px;margin-right:4px;vertical-align:1px}
 
   
@@ -305,19 +310,20 @@
 
   
   
-  .expense-grid{display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-top:6px}
+  /* v46 需求2：分类改紧凑 chip——图标缩小、横排排布，一行多个，给金额/日期让出首屏 */
+  .expense-grid{display:flex; flex-wrap:wrap; gap:7px; margin-top:6px}
   .exp-cell{
-    background:var(--cream2); border:1px solid var(--line2); border-radius:14px;
-    display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 6px;
+    background:var(--cream2); border:1px solid var(--line2); border-radius:999px;
+    display:inline-flex; flex-direction:row; align-items:center; gap:5px; padding:5px 11px 5px 5px;
     cursor:pointer; transition:.15s; color:var(--ink); font:inherit;
-    min-width:0;   
+    min-width:0; min-height:36px;
   }
   .exp-cell:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm)}
   .exp-cell:active{transform:scale(.97)}
-  .exp-ico{width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .2s}
+  .exp-ico{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .2s; flex:0 0 26px}
   .exp-cell:hover .exp-ico{transform:scale(1.08)}
-  .exp-ico svg{width:22px; height:22px}
-  .exp-name{font-size:12.5px; font-weight:600; color:var(--ink)}
+  .exp-ico svg{width:15px; height:15px}
+  .exp-name{font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap}
   
   .exp-cell.on{
     background:var(--mint-deep); border-color:var(--mint);
@@ -773,7 +779,15 @@
           <button data-dir="debt" class="debt">负债</button>
           <button data-dir="work" class="work">外事办</button>
         </div>
-        <div style="height:14px"></div>
+        <div style="height:12px"></div>
+
+        <!-- v46 需求2+5：金额、日期上移到分类之前——打开就是填金额，键盘不挡分类；分类改成紧凑 chip -->
+        <label class="fld"><span class="t">金额（¥）</span>
+          <input type="number" id="amtInp" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
+        </label>
+        <label class="fld"><span class="t">日期（可改成过去，补记往期收入）</span>
+          <input type="date" id="dateInp" style="font-size:16px">
+        </label>
 
         <!-- 内联「分类选择」：支出=8 网格 / 收入=4 chip；点哪个就是这笔的分类 -->
         <div class="pickerWrap" id="pickerWrap">
@@ -798,12 +812,6 @@
 
         <div style="height:10px"></div>
 
-        <label class="fld"><span class="t">金额（¥）</span>
-          <input type="number" id="amtInp" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
-        </label>
-        <label class="fld"><span class="t">日期（可改成过去，补记往期收入）</span>
-          <input type="date" id="dateInp" style="font-size:16px">
-        </label>
         <label class="fld" id="kfcHolidayRow" style="display:none; margin-top:-4px">
           <span class="t" style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink)">
             <input type="checkbox" id="kfcHolidayChk" style="width:18px;height:18px;accent-color:var(--mint)"> 法定休假日班（¥48/时，非双休日周末）
@@ -1063,7 +1071,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v45-month-prune';
+const APP_VERSION='v46-ui-compact';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -1437,22 +1445,22 @@ function renderClarityBoard(){
   el.innerHTML = `
     <div class="clarity-grid">
       <div class="clarity-item life">
-        <div class="clab">生活账（弹性）</div>
+        <div class="clab">生活账</div>
         <div class="cval">${fmt2(elastic)}</div>
-        <div class="csub">餐饮 交通 购物 娱乐等</div>
+        <div class="csub">餐饮 交通 购物</div>
       </div>
       <div class="clarity-item fixed">
         <div class="clab">固定成本</div>
         <div class="cval">${fmt2(fixed)}</div>
-        <div class="csub">日均 ${fmt2(fixedDaily)} · 房贷 水电等</div>
+        <div class="csub">日均 ${fmt2(fixedDaily)}</div>
       </div>
       <div class="clarity-item work">
         <div class="clab">外事办未收</div>
         <div class="cval" style="color:${due>0?'#B46A18':'#0F6E56'}">${fmt2(due)}</div>
-        <div class="csub">本月回款 ${fmt2(workIn)} / 垫付 ${fmt2(workOut)}</div>
+        <div class="csub">回款 ${fmt2(workIn)} / 垫付 ${fmt2(workOut)}</div>
       </div>
     </div>
-    <div class="clarity-note">${scopeTxt}今日入账 ${fmt2(todayIncome)}（按日发薪，按实记） · 真实收入 ${fmt2(realIncome)}（含外事办净收入 ${fmt2(wnet)}） · 收入 − 固定 − 生活 = <b>${fmt2(budget)}</b></div>`;
+    <div class="clarity-note">${scopeTxt}今日入账 ${fmt2(todayIncome)} · 收入 − 固定 − 生活 = <b>${fmt2(budget)}</b> · 明细见下方结算</div>`;
 }
 
 /* =================== 本月日历 =================== */
@@ -2705,25 +2713,34 @@ if('serviceWorker' in navigator){
 /* 键盘弹起时隐藏底部 dock + 把被聚焦的输入框滚到可视区中央（修输入法遮挡金额输入框） */
 function focusIntoView(el){
   if(!el) return;
-  // 平滑滚到可视区中央，等键盘完全弹起再二次校准
-  try{
-    el.scrollIntoView({block:'center', behavior:'smooth'});
-  }catch(_){ el.scrollIntoView(); }
-  setTimeout(()=>{
-    try{ el.scrollIntoView({block:'center', behavior:'smooth'}); }catch(_){}
-  }, 250);
-  setTimeout(()=>{
-    try{ el.scrollIntoView({block:'center', behavior:'smooth'}); }catch(_){}
-  }, 500);
+  // v46 需求5：scrollIntoView 按 layout viewport 居中，键盘弹起时可视区只剩上半屏，
+  // 仍会被盖。改为按 visualViewport 的可视高度算偏移，把输入框放到可视区上 1/3。
+  const place=()=>{
+    try{
+      const vv=window.visualViewport;
+      if(!vv){ el.scrollIntoView({block:'center',behavior:'smooth'}); return; }
+      const r=el.getBoundingClientRect();
+      const visibleH=vv.height;                       // 键盘弹起后真正可见的高度
+      const want=vtopOf(vv)+visibleH*0.34;            // 目标：可视区上三分之一处
+      const delta=r.top-want;
+      if(Math.abs(delta)>2) window.scrollBy({top:delta, behavior:'smooth'});
+    }catch(_){ try{ el.scrollIntoView({block:'center'}); }catch(__){} }
+  };
+  place();
+  setTimeout(place, 260);
+  setTimeout(place, 520);
 }
+function vtopOf(vv){ return (vv && typeof vv.offsetTop==='number') ? vv.offsetTop : 0; }
 if(window.visualViewport){
   const dock=document.querySelector('.bottomtab');
   const vvHandler=()=>{
-    const keyboardUp = window.innerHeight - window.visualViewport.height > 80;
+    const vv=window.visualViewport;
+    const kb = Math.max(0, window.innerHeight - vv.height - vtopOf(vv));  // 键盘高度
+    const keyboardUp = kb > 80;
     if(dock) dock.style.display = keyboardUp ? 'none' : '';
-    document.querySelectorAll('.main').forEach(m=>m.style.paddingBottom = keyboardUp ? '20px' : '');
+    // v46：键盘弹起时把页面底部撑开一个键盘的高度，否则没有可滚动空间，日期必然被盖
+    document.querySelectorAll('.main').forEach(m=>m.style.paddingBottom = keyboardUp ? (kb+24)+'px' : '');
     if(keyboardUp){
-      // 键盘弹起时：找当前聚焦的输入框，滚到可视区中央
       const ae = document.activeElement;
       if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')){
         focusIntoView(ae);
@@ -2740,18 +2757,7 @@ document.addEventListener('focusin',(e)=>{
     focusIntoView(el);
   }
 });
-/* 输入框容器额外留点顶部安全距离，避免聚焦时仍被键盘顶部工具栏遮挡 */
-document.addEventListener('focusin',(e)=>{
-  const el=e.target;
-  if(!el) return;
-  if(el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT'){
-    setTimeout(()=>{
-      const main=document.querySelector('.main');
-      if(!main) return;
-      main.scrollTop = Math.max(0, main.scrollTop - 8);
-    }, 320);
-  }
-});
+/* v46：旧的"聚焦后上推 8px"兜底已移除——键盘空间由 visualViewport 撑开 + focusIntoView 定位统一处理 */
 
 paintIcons();
 bind();
