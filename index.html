@@ -321,16 +321,16 @@
   .expense-grid{display:flex; flex-wrap:wrap; gap:7px; margin-top:6px}
   .exp-cell{
     background:var(--cream2); border:1px solid var(--line2); border-radius:999px;
-    display:inline-flex; flex-direction:row; align-items:center; gap:5px; padding:5px 11px 5px 5px;
+    display:inline-flex; flex-direction:row; align-items:center; gap:6px; padding:6px 13px 6px 6px;
     cursor:pointer; transition:.15s; color:var(--ink); font:inherit;
-    min-width:0; min-height:36px;
+    min-width:0; min-height:42px;
   }
   .exp-cell:hover{transform:translateY(-1px); box-shadow:var(--shadow-sm)}
   .exp-cell:active{transform:scale(.97)}
-  .exp-ico{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .2s; flex:0 0 26px}
+  .exp-ico{width:29px; height:29px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:transform .2s; flex:0 0 29px}
   .exp-cell:hover .exp-ico{transform:scale(1.08)}
-  .exp-ico svg{width:15px; height:15px}
-  .exp-name{font-size:12.5px; font-weight:600; color:var(--ink); white-space:nowrap}
+  .exp-ico svg{width:17px; height:17px}
+  .exp-name{font-size:14px; font-weight:600; color:var(--ink); white-space:nowrap}
   
   .exp-cell.on{
     background:var(--mint-deep); border-color:var(--mint);
@@ -856,7 +856,7 @@
         <label class="fld"><span class="t">金额（¥）</span>
           <input type="number" id="amtInp" inputmode="decimal" placeholder="0.00" min="0" step="0.01">
         </label>
-        <label class="fld"><span class="t">日期（点一下选，可改成过去补记）</span>
+        <label class="fld"><span class="t">日期</span>
           <input type="text" id="dateInp" readonly placeholder="点这里选日期" autocomplete="off">
         </label>
 
@@ -866,7 +866,7 @@
             <span id="pickerIc"></span>
             <span id="pickerTitleText">支出分类</span>
           </h2>
-          <p class="muted" id="pickerHint" style="margin:-4px 0 12px">点哪个就是这笔的分类，下面只填金额和日期。</p>
+          <p class="muted" id="pickerHint" style="display:none"></p>
           <div id="pickerOut"><div id="expenseGrid"></div></div>
           <div id="pickerIn" style="display:none"><div id="incomeChips"></div></div>
           <div id="pickerDebt" style="display:none">
@@ -1207,7 +1207,7 @@ let S = { settings:null, tx:[], error:null, ready:false };
    - gist:  你的私有 Gist + 带 gist 权限的 Token，手机/网页共享同一份 JSON（ledger-data.json） */
 const KEY_TX='wb_ledger_tx_v1', KEY_SET='wb_ledger_settings_v1', KEY_SYNC='wb_ledger_sync_v1';
 /* v37 版本号：显示在设置页「关于 · 版本」，用于判断手机是否还在跑旧缓存 */
-const APP_VERSION='v48-nav-drawer-bigdate';
+const APP_VERSION='v49-cleaner-bigger';
 
 /* v38 删除墓碑（tombstone）：记录已被删除的流水 id + 删除时刻。
    为什么需要：同步用的是「按 id 取并集」的 mergeById，它天然不会删除任何东西——
@@ -2157,7 +2157,7 @@ function renderExpenseGrid(){
   ];
   /* 三分法改造：把原本定义了却没有入口的固定五项放回记账页 */
   el.innerHTML = `
-    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">房贷（每月5日自动记，无需手填）</div>
+    <div class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:.3px;margin:0 0 8px">房贷</div>
     <div class="expense-grid" style="margin-bottom:14px">${CATS.out_mortgage.map(c=>`<button class="exp-cell" data-cat="${c}" data-group="fixed">
       ${expCellInner(c)}
     </button>`).join('')}</div>
@@ -2300,7 +2300,7 @@ function syncPickerArea(){
   if(curDir==='out'){
     out.style.display=''; inn.style.display='none'; dbt.style.display='none';
     t.textContent='支出分类';
-    h.textContent='点哪个就是这笔的分类，下面只填金额和日期。';
+    if(h) h.textContent='';
     ic.innerHTML = ICON.pen;
     // 若 pickedCat 不是支出分类，重置为支出默认「餐饮」
     if(pickedCat.g!=='elastic' && pickedCat.g!=='fixed' && pickedCat.g!=='bill'){
@@ -2309,7 +2309,7 @@ function syncPickerArea(){
   }else if(curDir==='in'){
     out.style.display='none'; inn.style.display=''; dbt.style.display='none';
     t.textContent='收入分类';
-    h.textContent='点哪个就是这笔的来源，下面只填金额和日期。';
+    if(h) h.textContent='';
     ic.innerHTML = ICON.coin;
     // 若 pickedCat 不是收入分类，重置为收入默认「KFC兼职」
     if(pickedCat.g!=='income'){
@@ -2318,7 +2318,7 @@ function syncPickerArea(){
   }else if(curDir==='debt'){ // debt
     out.style.display='none'; inn.style.display='none'; dbt.style.display='';
     t.textContent='负债分类';
-    h.textContent='先选负债（房贷/花呗信用卡等），再选计入哪个支出分类，下面填金额日期。';
+    if(h) h.textContent='';
     ic.innerHTML = ICON.debt||ICON.shield;
     // 若 pickedCat 不是负债分类，重置为负债默认「房贷」，并按映射给出支出分类默认
     if(pickedCat.g!=='debt'){
@@ -2329,7 +2329,7 @@ function syncPickerArea(){
   }else if(curDir==='work'){
     out.style.display='none'; inn.style.display='none'; dbt.style.display='none';
     t.textContent='外事办往来';
-    h.textContent='回款先冲最早的垫付，超出部分自动计收入，未冲完的显示未收。';
+    if(h) h.textContent='';
     ic.innerHTML = ICON.debt||ICON.shield;
     if(pickedCat.g!=='work') pickedCat = { c: CATS.work[0], g: 'work' };
     renderWorkChips();
